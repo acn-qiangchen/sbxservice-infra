@@ -1,5 +1,5 @@
 # Build stage
-FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+FROM maven:3.8-openjdk-17 AS builder
 WORKDIR /app
 # Copy pom.xml to download dependencies
 COPY pom.xml .
@@ -11,10 +11,10 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+FROM openjdk:17-slim
 WORKDIR /app
 # Add a non-root user
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN groupadd -r spring && useradd -r -g spring spring
 USER spring:spring
 # Copy the JAR file from the build stage
 COPY --from=builder /app/target/*.jar app.jar
@@ -26,7 +26,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
 
 # Run the application with proper JVM options
 ENTRYPOINT ["java", \
-  "-XX:+UnlockExperimentalVMOptions", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
   "-Djava.security.egd=file:/dev/./urandom", \

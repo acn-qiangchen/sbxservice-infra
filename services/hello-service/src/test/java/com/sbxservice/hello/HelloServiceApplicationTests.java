@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
 /**
  * Integration tests for the Hello Service application.
@@ -33,15 +34,17 @@ class HelloServiceApplicationTests {
     @DisplayName("API endpoint is accessible")
     void apiEndpointIsAccessible() throws Exception {
         mockMvc.perform(get("/api/hello")
-                .contentType(MediaType.APPLICATION_JSON))
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Hello")));
     }
 
     @Test
-    @DisplayName("Swagger UI is accessible")
+    @DisplayName("Swagger UI redirects to the correct location")
     void swaggerUiIsAccessible() throws Exception {
         mockMvc.perform(get("/swagger-ui.html"))
-                .andExpect(status().isOk());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/swagger-ui/index.html"));
     }
 } 

@@ -1,30 +1,23 @@
 package com.sbxservice.hello.model;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.ToString;
 
 /**
  * Model class representing a greeting response.
  */
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class GreetingResponse {
     
     /**
      * The greeting message to be returned to the client.
      */
     private String message;
-    
-    /**
-     * Default constructor.
-     */
-    public GreetingResponse() {
-    }
-    
-    /**
-     * Constructor with message parameter.
-     *
-     * @param message the greeting message
-     */
-    public GreetingResponse(String message) {
-        this.message = message;
-    }
 } 
