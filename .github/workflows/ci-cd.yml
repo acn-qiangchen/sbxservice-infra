@@ -1,0 +1,152 @@
+name: SBXService CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      service:
+        description: 'Service to deploy (leave empty for all)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_PREFIX: sbxservice
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [user-service, auth-service]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+        SERVICE_NAME: ${{ matrix.service }}
+      run: |
+        # Build a docker container and push it to ECR
+        cd services/$SERVICE_NAME
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-$SERVICE_NAME:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-$SERVICE_NAME:$IMAGE_TAG
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY_PREFIX-$SERVICE_NAME:$IMAGE_TAG"
+    
+    - name: Run tests
+      env:
+        SERVICE_NAME: ${{ matrix.service }}
+      run: |
+        cd services/$SERVICE_NAME
+        # Run tests (this will depend on the service's technology stack)
+        echo "Running tests for $SERVICE_NAME"
+        # Example: npm test or pytest
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+    
+    strategy:
+      matrix:
+        service: [user-service, auth-service]
+        # Only deploy the specified service if provided, otherwise deploy all
+        filter:
+          - ${{ github.event.inputs.service == '' || github.event.inputs.service == matrix.service }}
+    
+    # Skip this job if the service doesn't match the filter
+    if: ${{ matrix.filter == true }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    
+    - name: Deploy to AWS
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+        SERVICE_NAME: ${{ matrix.service }}
+        ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+        DEPLOYMENT_TYPE: ecs  # or eks, lambda based on your deployment strategy
+      run: |
+        # Run deployment script
+        ./scripts/deploy.sh
+
+  terraform-apply:
+    needs: build-and-test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: 1.0.0
+    
+    - name: Terraform Init
+      run: |
+        cd infrastructure/terraform
+        terraform init \
+          -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+          -backend-config="key=terraform/state/${{ github.event.inputs.environment || 'dev' }}" \
+          -backend-config="region=${{ env.AWS_REGION }}" \
+          -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+    
+    - name: Terraform Plan
+      run: |
+        cd infrastructure/terraform
+        terraform plan -var="environment=${{ github.event.inputs.environment || 'dev' }}" -out=tfplan
+    
+    - name: Terraform Apply
+      run: |
+        cd infrastructure/terraform
+        terraform apply -auto-approve tfplan 
