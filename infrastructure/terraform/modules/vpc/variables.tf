@@ -13,7 +13,22 @@ variable "environment" {
   type        = string
 }
 
-variable "azs" {
+variable "availability_zones" {
   description = "List of availability zones to use"
+  type        = list(string)
+}
+
+variable "public_subnet_cidrs" {
+  description = "List of CIDR blocks for public subnets"
+  type        = list(string)
+}
+
+variable "private_subnet_cidrs" {
+  description = "List of CIDR blocks for private subnets"
+  type        = list(string)
+}
+
+variable "firewall_subnet_cidrs" {
+  description = "List of CIDR blocks for firewall subnets"
   type        = list(string)
 } 

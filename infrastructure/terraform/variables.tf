@@ -1,11 +1,11 @@
 variable "aws_region" {
-  description = "The AWS region to deploy resources"
+  description = "AWS region where resources will be deployed"
   type        = string
   default     = "us-east-1"
 }
 
 variable "aws_profile" {
-  description = "AWS CLI profile to use (optional, leave empty for GitHub Actions)"
+  description = "AWS profile to use"
   type        = string
   default     = ""
 }
@@ -32,6 +32,24 @@ variable "availability_zones" {
   description = "List of availability zones to use"
   type        = list(string)
   default     = ["us-east-1a", "us-east-1b"]
+}
+
+variable "public_subnet_cidrs" {
+  description = "List of CIDR blocks for public subnets"
+  type        = list(string)
+  default     = ["10.0.0.0/24", "10.0.1.0/24"]
+}
+
+variable "private_subnet_cidrs" {
+  description = "List of CIDR blocks for private subnets"
+  type        = list(string)
+  default     = ["10.0.10.0/24", "10.0.11.0/24"]
+}
+
+variable "firewall_subnet_cidrs" {
+  description = "List of CIDR blocks for firewall subnets"
+  type        = list(string)
+  default     = ["10.0.20.0/24", "10.0.21.0/24"]
 }
 
 # Database variables are commented out since we're not using a database in our POC

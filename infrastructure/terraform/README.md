@@ -12,15 +12,35 @@ This directory contains Terraform configuration to deploy the SBXService POC arc
 
 The Terraform configuration creates the following AWS resources:
 
-- VPC with public subnets
+- VPC with public and private subnets
+- Network Firewall for enhanced security
 - Security groups
 - ECR repository for the container image
 - ECS cluster with Fargate launch type
 - ECS task definition and service
 - Application Load Balancer
 - REST API Gateway
+- AWS App Mesh for service mesh capabilities
 - CloudWatch Logs
 - IAM roles and policies
+
+## Network Firewall Architecture
+
+The deployment includes AWS Network Firewall for enhanced security:
+
+- Dedicated firewall subnets in each availability zone
+- Network Firewall with inspection of traffic between public and private subnets
+- Custom Suricata-compatible rules for traffic inspection
+- No stateless rules or TLS inspection
+- Traffic routing through firewall endpoints for traffic from ALB to ECS services
+- Secure return path for traffic from private subnets back to public subnets
+
+The Network Firewall allows fine-grained control over north-south traffic flow and provides:
+- Deep packet inspection with Suricata-compatible rule syntax
+- HTTP protocol compliance checking
+- SQL injection attack detection
+- Malicious user agent blocking
+- Suspicious IP range filtering
 
 ## Local Development Configuration
 

@@ -37,10 +37,31 @@ provider "aws" {
 module "vpc" {
   source = "./modules/vpc"
   
-  environment  = var.environment
-  vpc_cidr     = var.vpc_cidr
-  azs          = var.availability_zones
-  project_name = var.project_name
+  environment        = var.environment
+  vpc_cidr           = var.vpc_cidr
+  availability_zones = var.availability_zones
+  project_name       = var.project_name
+  
+  public_subnet_cidrs   = var.public_subnet_cidrs
+  private_subnet_cidrs  = var.private_subnet_cidrs
+  firewall_subnet_cidrs = var.firewall_subnet_cidrs
+}
+
+# Network Firewall
+module "network_firewall" {
+  source = "./modules/network_firewall"
+  
+  project_name         = var.project_name
+  environment          = var.environment
+  vpc_id               = module.vpc.vpc_id
+  vpc_cidr             = var.vpc_cidr
+  firewall_subnet_ids  = module.vpc.firewall_subnets
+  public_subnet_cidrs  = module.vpc.public_subnet_cidrs
+  private_subnet_cidrs = module.vpc.private_subnet_cidrs
+  public_route_tables_by_az = module.vpc.public_route_tables_by_az
+  private_route_tables_by_az = module.vpc.private_route_tables_by_az
+  nat_gateway_id       = module.vpc.nat_gateway_id
+  availability_zones   = var.availability_zones
 }
 
 # Security Groups
@@ -128,4 +149,14 @@ output "alb_dns_name" {
 output "mesh_name" {
   description = "The name of the App Mesh service mesh"
   value       = module.app_mesh.mesh_name
+}
+
+output "network_firewall_status" {
+  description = "Network Firewall status details"
+  value       = module.network_firewall.firewall_status
+}
+
+output "firewall_policy_id" {
+  description = "ID of the Network Firewall Policy"
+  value       = module.network_firewall.firewall_policy_id
 } 

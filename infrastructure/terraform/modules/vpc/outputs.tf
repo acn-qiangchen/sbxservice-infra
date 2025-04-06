@@ -13,6 +13,21 @@ output "private_subnets" {
   value       = aws_subnet.private[*].id
 }
 
+output "firewall_subnets" {
+  description = "List of IDs of firewall subnets"
+  value       = aws_subnet.firewall[*].id
+}
+
+output "public_subnet_cidrs" {
+  description = "List of CIDR blocks of public subnets"
+  value       = aws_subnet.public[*].cidr_block
+}
+
+output "private_subnet_cidrs" {
+  description = "List of CIDR blocks of private subnets"
+  value       = aws_subnet.private[*].cidr_block
+}
+
 output "nat_gateway_id" {
   description = "ID of the NAT Gateway"
   value       = aws_nat_gateway.main.id
@@ -23,12 +38,12 @@ output "internet_gateway_id" {
   value       = aws_internet_gateway.main.id
 }
 
-output "public_route_table_id" {
-  description = "ID of the public route table"
-  value       = aws_route_table.public.id
+output "public_route_tables_by_az" {
+  description = "Map of AZ to public route table IDs"
+  value       = { for az, rt in aws_route_table.public : az => rt.id }
 }
 
-output "private_route_table_id" {
-  description = "ID of the private route table"
-  value       = aws_route_table.private.id
+output "private_route_tables_by_az" {
+  description = "Map of AZ to private route table IDs"
+  value       = { for az, rt in aws_route_table.private : az => rt.id }
 } 

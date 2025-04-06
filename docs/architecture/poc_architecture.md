@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines a minimal viable architecture for the SBXService POC on AWS, focusing on deploying a simple "Hello World" Spring Boot microservice on Amazon ECS with Fargate, integrated with AWS App Mesh for service mesh capabilities.
+This document outlines a minimal viable architecture for the SBXService POC on AWS, focusing on deploying a simple "Hello World" Spring Boot microservice on Amazon ECS with Fargate, integrated with AWS App Mesh for service mesh capabilities and AWS Network Firewall for enhanced security.
 
 ## Architecture Diagram
 
@@ -16,8 +16,14 @@ This document outlines a minimal viable architecture for the SBXService POC on A
                      │     ALB     │
                      └──────┬──────┘
                             │
-  ┌───────────────────────────────────────────────┐
-  │                                               │
+                            ▼
+                    ┌──────────────┐
+                    │AWS Network   │
+                    │Firewall      │
+                    └──────┬───────┘
+                           │
+  ┌───────────────────────┼───────────────────────┐
+  │                       ▼                       │
   │  ECS Cluster (Fargate)                        │
   │  ┌───────────────────────────────────────┐    │
   │  │                AWS App Mesh           │    │
@@ -43,7 +49,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Simple containerized Spring Boot application providing a "Hello World" REST API
    - Deployed to ECS Fargate (serverless containers)
    - Accessible via API Gateway and ALB
-   - Default Fargate configuration (0.25 vCPU, 0.5GB memory) should be sufficient
+   - Default Fargate configuration (1 vCPU, 2GB memory)
 
 2. **AWS App Mesh**
    - Service mesh architecture for fine-grained control over service-to-service communication
@@ -51,13 +57,100 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Service discovery via AWS Cloud Map
    - X-Ray integration for distributed tracing
 
-3. **Networking & Security**
-   - VPC with public and private subnets
+3. **AWS Network Firewall**
+   - Network-level protection between public and private resources
+   - Stateful inspection of traffic with Suricata-compatible rules
+   - Custom Suricata rules for HTTP protocol enforcement and attack prevention
+   - No TLS inspection or stateless rules
+   - Dedicated firewall subnet for Network Firewall endpoints
+   - Advanced security inspection for north-south traffic
+
+4. **Networking & Security**
+   - VPC with public, private, and firewall subnets
    - Security groups for network traffic control
    - IAM roles for service permissions
    - Private subnets for ECS tasks
 
-4. **Monitoring**
+## Network Route Table Design
+
+The POC architecture employs a sophisticated traffic routing strategy via AWS Network Firewall to ensure all traffic between public and private subnets is inspected:
+
+1. **Subnet Structure**
+   - **Public Subnets**: Host internet-facing resources (ALB, NAT Gateway)
+   - **Firewall Subnets**: Dedicated subnets for Network Firewall endpoints
+   - **Private Subnets**: Host protected resources (ECS Fargate tasks)
+
+2. **Traffic Flow Design**
+   - All traffic between public and private subnets must traverse through Network Firewall endpoints
+   - Each AZ has its own set of route tables to maintain traffic symmetry
+   - Traffic stays within the same AZ to ensure consistent state tracking
+
+3. **Route Table Configuration**
+   - **Public Subnet Route Tables**: 
+     - Local routes for intra-VPC communication
+     - Internet Gateway routes for external traffic
+     - Routes to private subnets point to the Network Firewall endpoint in the same AZ
+   
+   - **Private Subnet Route Tables**:
+     - Local routes for intra-VPC communication
+     - Routes to public subnets point to the Network Firewall endpoint in the same AZ
+     - Internet-bound traffic routed through NAT Gateway via Network Firewall
+
+4. **Traffic Symmetry**
+   - Outbound traffic from private to public subnets traverses the firewall endpoint in the same AZ as the source
+   - Return traffic from public to private subnets traverses the firewall endpoint in the same AZ as the destination
+   - This design ensures both outbound and return traffic flow through the same firewall endpoint, maintaining connection state
+
+5. **AZ Isolation**
+   - Each AZ has independent traffic flows through dedicated firewall endpoints
+   - Failure in one AZ doesn't impact traffic flow in other AZs
+   - Ensures high availability and fault tolerance
+
+```
+                             ┌─────────────────────┐
+                             │ Internet Gateway    │
+                             └──────────┬──────────┘
+                                        │
+                                        ▼
+      AZ-A                      AZ-A Public Subnet                  AZ-B                      AZ-B Public Subnet
+┌────────────────┐           ┌────────────────────┐          ┌────────────────┐           ┌────────────────────┐
+│                │           │    ┌─────────┐     │          │                │           │    ┌─────────┐     │
+│                │◄──────────┤    │   ALB   │     │          │                │◄──────────┤    │   ALB   │     │
+│                │           │    └────┬────┘     │          │                │           │    └────┬────┘     │
+│  Firewall      │           └─────────┼──────────┘          │  Firewall      │           └─────────┼──────────┘
+│  Subnet        │                     │ ▲                    │  Subnet        │                     │ ▲
+│                │                     │ │                    │                │                     │ │
+│  ┌──────────┐  │                     ▼ │                    │  ┌──────────┐  │                     ▼ │
+│  │ Network  │  │◄────────────────────  │                    │  │ Network  │  │◄────────────────────  │
+│  │ Firewall │  │                       │                    │  │ Firewall │  │                       │
+│  │ Endpoint │  │                       │                    │  │ Endpoint │  │                       │
+│  └────┬─────┘  │                       │                    │  └────┬─────┘  │                       │
+│       │        │                       │                    │       │        │                       │
+└───────┼────────┘                       │                    └───────┼────────┘                       │
+        │                                │                            │                                │
+        │                                │                            │                                │
+        ▼                                │                            ▼                                │
+┌────────────────┐                       │                    ┌────────────────┐                       │
+│                │                       │                    │                │                       │
+│  Private       │                       │                    │  Private       │                       │
+│  Subnet        │                       │                    │  Subnet        │                       │
+│                │                       │                    │                │                       │
+│  ┌──────────┐  │                       │                    │  ┌──────────┐  │                       │
+│  │   ECS    │  │                       └────────────────────┤  │   ECS    │  │                       └────────────────────┐
+│  │  Fargate │  │                                            │  │  Fargate │  │                                            │
+│  └──────────┘  │                                            │  └──────────┘  │                                            │
+│                │                                            │                │                                            │
+└────────────────┘                                            └────────────────┘                                            │
+                                                                                                                           │
+                                                                                                                           │
+                                                                                                                           ▼
+                                                                                                                 Traffic Flow Legend:
+                                                                                                                 -------------------
+                                                                                                                 → Outbound Traffic
+                                                                                                                 ← Return Traffic
+```
+
+6. **Monitoring**
    - Basic CloudWatch metrics for service monitoring
    - Container logs sent to CloudWatch Logs
    - Distributed tracing with AWS X-Ray
@@ -82,6 +175,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Create ECR repository for container images
    - Set up ECS cluster with Fargate launch type
    - Configure App Mesh service mesh
+   - Deploy Network Firewall with security rules
    - Configure task definition with Envoy sidecar
    - Set up API Gateway with REST API type
 
@@ -90,6 +184,25 @@ This document outlines a minimal viable architecture for the SBXService POC on A
      - Building the Spring Boot application
      - Creating and pushing Docker image to ECR
      - Deploying updated task definition to ECS
+
+## Network Firewall Benefits
+
+1. **Network Security**
+   - Stateful inspection of traffic with managed rule groups
+   - Protection against common threats and vulnerabilities
+   - Deep packet inspection for malicious payloads
+   - Protocol anomaly detection
+
+2. **Security Visibility**
+   - Centralized logging of network traffic
+   - Alert on suspicious patterns
+   - Audit trails for security events
+   - Integration with AWS security services
+
+3. **Compliance**
+   - Helps meet regulatory requirements for network security
+   - Provides documentation for security audits
+   - Supports security best practices
 
 ## App Mesh Benefits
 
@@ -113,11 +226,13 @@ This document outlines a minimal viable architecture for the SBXService POC on A
 1. **Cost Optimization**
    - Standard Fargate pricing will apply
    - Additional costs for App Mesh (per hour per mesh endpoint)
+   - Network Firewall costs based on number of firewall endpoints
    - X-Ray has minimal costs for POC workloads
    - API Gateway will use pay-per-use pricing model
 
 2. **Security**
    - Basic security groups to allow inbound traffic only to required ports
+   - Network Firewall for advanced traffic inspection
    - IAM roles with least privilege for ECS tasks
    - No custom domain or SSL/TLS requirements for the POC phase
 
@@ -125,6 +240,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
 
 1. **Evaluation Criteria**
    - Successful deployment of Spring Boot application to ECS Fargate with App Mesh
+   - Network Firewall properly securing traffic between public and private resources
    - Accessible API endpoints via API Gateway
    - Functional CI/CD pipeline
    - Traffic management via App Mesh
@@ -136,5 +252,6 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Data persistence layer
    - Auto-scaling based on traffic patterns
    - Multi-service App Mesh implementation
+   - Advanced Network Firewall rule sets
 
-This architecture provides a solid foundation for demonstrating the core functionality of a service mesh while keeping complexity and costs to a minimum. It can be expanded upon based on the POC results and feedback. 
+This architecture provides a solid foundation for demonstrating the core functionality of a service mesh and network security while keeping complexity and costs to a minimum. It can be expanded upon based on the POC results and feedback. 
