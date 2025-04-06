@@ -1,0 +1,99 @@
+name: Terraform Operations
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/terraform/**'
+      - '.github/workflows/terraform.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/terraform/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+env:
+  AWS_REGION: us-east-1
+  TF_VAR_aws_region: us-east-1
+  TF_VAR_project_name: sbxservice
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+    
+    - name: Terraform Init
+      run: |
+        cd infrastructure/terraform
+        terraform init
+        # Uncomment the following for S3 backend when ready
+        # terraform init \
+        #   -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+        #   -backend-config="key=terraform/state/${{ github.event.inputs.environment || 'dev' }}" \
+        #   -backend-config="region=${{ env.AWS_REGION }}" \
+        #   -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+    
+    - name: Terraform Plan
+      id: plan
+      run: |
+        cd infrastructure/terraform
+        terraform plan -var="environment=${{ github.event.inputs.environment || 'dev' }}" -var="aws_profile=" -out=tfplan
+        
+        # Create a summary of the plan
+        echo "#### Terraform Plan Output" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        terraform show -no-color tfplan | grep -E '(^  \+|^  \-|^  \~)' >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Terraform Apply
+      if: github.event.inputs.action == 'apply' && github.event_name == 'workflow_dispatch'
+      run: |
+        cd infrastructure/terraform
+        terraform apply -auto-approve tfplan
+        
+        # Record outputs
+        echo "#### Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        terraform output >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+    
+    - name: Terraform Destroy
+      if: github.event.inputs.action == 'destroy' && github.event_name == 'workflow_dispatch'
+      run: |
+        cd infrastructure/terraform
+        terraform destroy -auto-approve -var="environment=${{ github.event.inputs.environment || 'dev' }}" -var="aws_profile=" 

@@ -86,6 +86,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+!terraform.tfvars.example
 
 # CLI configuration files
 .terraformrc

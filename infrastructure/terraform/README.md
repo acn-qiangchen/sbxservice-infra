@@ -18,9 +18,42 @@ The Terraform configuration creates the following AWS resources:
 - ECS cluster with Fargate launch type
 - ECS task definition and service
 - Application Load Balancer
-- API Gateway (HTTP API)
+- REST API Gateway
 - CloudWatch Logs
 - IAM roles and policies
+
+## Local Development Configuration
+
+1. Create a `terraform.tfvars` file from the example:
+
+```bash
+cp terraform.tfvars.example terraform.tfvars
+```
+
+2. Edit the `terraform.tfvars` file to match your local configuration:
+
+```bash
+# Set your AWS profile and other settings
+aws_profile = "your-aws-profile"
+```
+
+## CI/CD Configuration
+
+The project uses separate GitHub Actions workflows for service deployments and Terraform operations:
+
+### 1. Service CI/CD Workflow (.github/workflows/ci-cd.yml)
+- Triggered when service code changes
+- Builds Java applications, creates Docker images, and pushes to ECR
+- Forces new ECS deployments with the updated images
+
+### 2. Terraform Workflow (.github/workflows/terraform.yml)
+- Triggered when infrastructure code changes
+- Runs `terraform plan` automatically on changes
+- Applies Terraform changes only when manually triggered with the 'apply' action
+- Provides options for planning, applying, or destroying infrastructure
+- Infrastructure changes require explicit approval via the GitHub Actions UI
+
+For both workflows, AWS credentials are provided via GitHub Secrets, not AWS profiles.
 
 ## Usage
 
@@ -33,15 +66,21 @@ terraform init
 2. Review the execution plan:
 
 ```bash
-# Make sure to use the correct AWS profile
+# For local development with AWS profile:
 terraform plan
+
+# For CI/CD or when using AWS environment variables (not profile):
+terraform plan -var="aws_profile="
 ```
 
 3. Apply the configuration:
 
 ```bash
-# Make sure to use the correct AWS profile
+# For local development with AWS profile:
 terraform apply
+
+# For CI/CD or when using AWS environment variables (not profile):
+terraform apply -var="aws_profile="
 ```
 
 4. After successful application, Terraform will output:

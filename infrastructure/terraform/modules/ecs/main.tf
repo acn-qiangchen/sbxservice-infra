@@ -54,6 +54,13 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Attach App Mesh and X-Ray permissions to the execution role
+resource "aws_iam_role_policy_attachment" "ecs_execution_role_appmesh_policy" {
+  count      = var.service_mesh_enabled ? 1 : 0
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSAppMeshEnvoyAccess"
+}
+
 # ECS Task Role
 resource "aws_iam_role" "ecs_task_role" {
   name = "${var.project_name}-${var.environment}-ecs-task-role"
@@ -98,10 +105,45 @@ resource "aws_iam_policy" "task_logs_policy" {
   })
 }
 
+# Create a policy for App Mesh
+resource "aws_iam_policy" "app_mesh_policy" {
+  count       = var.service_mesh_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-appmesh-policy"
+  description = "Allow ECS tasks to use App Mesh"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "appmesh:StreamAggregatedResources",
+          "servicediscovery:DiscoverInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Attach CloudWatch logs policy to task role
 resource "aws_iam_role_policy_attachment" "task_logs" {
   role       = aws_iam_role.ecs_task_role.name
   policy_arn = aws_iam_policy.task_logs_policy.arn
+}
+
+# Attach App Mesh policy to task role
+resource "aws_iam_role_policy_attachment" "task_app_mesh" {
+  count      = var.service_mesh_enabled ? 1 : 0
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.app_mesh_policy[0].arn
+}
+
+# Attach X-Ray permissions to the task role
+resource "aws_iam_role_policy_attachment" "task_xray" {
+  count      = var.service_mesh_enabled ? 1 : 0
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
 }
 
 # CloudWatch Log Group
@@ -114,6 +156,17 @@ resource "aws_cloudwatch_log_group" "app" {
   }
 }
 
+# CloudWatch Log Group for App Mesh Envoy
+resource "aws_cloudwatch_log_group" "envoy" {
+  count             = var.service_mesh_enabled ? 1 : 0
+  name              = "/ecs/${var.project_name}-${var.environment}-envoy"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-envoy-logs"
+  }
+}
+
 # ECS Task Definition
 resource "aws_ecs_task_definition" "app" {
   family                   = "${var.project_name}-${var.environment}-task"
@@ -123,8 +176,127 @@ resource "aws_ecs_task_definition" "app" {
   memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
+  
+  # If App Mesh is enabled, add the necessary proxy configuration
+  dynamic "proxy_configuration" {
+    for_each = var.service_mesh_enabled ? [1] : []
+    
+    content {
+      type           = "APPMESH"
+      container_name = "envoy"
+      properties = {
+        AppPorts         = var.container_port
+        EgressIgnoredIPs = "169.254.170.2,169.254.169.254"
+        IgnoredUID       = "1337"
+        ProxyEgressPort  = 15001
+        ProxyIngressPort = 15000
+      }
+    }
+  }
 
-  container_definitions = jsonencode([
+  # Define container definitions with conditional App Mesh configuration
+  container_definitions = var.service_mesh_enabled ? jsonencode([
+    # Application container
+    {
+      name      = "${var.project_name}-${var.environment}-container"
+      image     = "${aws_ecr_repository.app.repository_url}:latest"
+      cpu       = var.task_cpu - 256 - 32 # Reserve some CPU for the Envoy proxy and X-Ray daemon
+      memory    = var.task_memory - 128 - 64 # Reserve some memory for the Envoy proxy and X-Ray daemon
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.container_port
+          hostPort      = var.container_port
+          protocol      = "tcp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.app.name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}/actuator/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
+      environment = [
+        {
+          name  = "APPMESH_VIRTUAL_NODE_NAME"
+          value = "mesh/${var.mesh_name}/virtualNode/${var.virtual_node_name}"
+        }
+      ]
+      dependsOn = [
+        {
+          containerName = "envoy"
+          condition     = "HEALTHY"
+        }
+      ]
+    },
+    # Envoy proxy container
+    {
+      name      = "envoy"
+      image     = "840364872350.dkr.ecr.${var.region}.amazonaws.com/aws-appmesh-envoy:v1.18.3.0-prod"
+      essential = true
+      cpu       = 256
+      memory    = 128
+      user      = "1337"
+      environment = [
+        {
+          name  = "APPMESH_VIRTUAL_NODE_NAME"
+          value = "mesh/${var.mesh_name}/virtualNode/${var.virtual_node_name}"
+        },
+        {
+          name  = "ENABLE_ENVOY_XRAY_TRACING"
+          value = "1"
+        }
+      ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"]
+        interval    = 5
+        timeout     = 2
+        retries     = 3
+        startPeriod = 10
+      }
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.envoy[0].name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "envoy"
+        }
+      }
+    },
+    # X-Ray daemon container
+    {
+      name      = "xray-daemon"
+      image     = "amazon/aws-xray-daemon:latest"
+      essential = true
+      cpu       = 32
+      memory    = 64
+      portMappings = [
+        {
+          containerPort = 2000
+          hostPort      = 2000
+          protocol      = "udp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.app.name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "xray"
+        }
+      }
+    }
+  ]) : jsonencode([
+    # Standard container without App Mesh
     {
       name      = "${var.project_name}-${var.environment}-container"
       image     = "${aws_ecr_repository.app.repository_url}:latest"
@@ -229,6 +401,14 @@ resource "aws_ecs_service" "app" {
     target_group_arn = aws_lb_target_group.app.arn
     container_name   = "${var.project_name}-${var.environment}-container"
     container_port   = var.container_port
+  }
+
+  # Service discovery registration for App Mesh
+  dynamic "service_registries" {
+    for_each = var.service_mesh_enabled ? [1] : []
+    content {
+      registry_arn = var.service_discovery_arn
+    }
   }
 
   depends_on = [

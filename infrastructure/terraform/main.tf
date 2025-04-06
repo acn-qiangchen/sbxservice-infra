@@ -22,7 +22,7 @@ terraform {
 
 provider "aws" {
   region  = var.aws_region
-  profile = "sbxservice-poc"
+  profile = var.aws_profile != "" ? var.aws_profile : null
   
   default_tags {
     tags = {
@@ -51,24 +51,40 @@ module "security_groups" {
   vpc_id      = module.vpc.vpc_id
 }
 
+# App Mesh for Service Mesh
+module "app_mesh" {
+  source = "./modules/app_mesh"
+  
+  project_name   = var.project_name
+  environment    = var.environment
+  vpc_id         = module.vpc.vpc_id
+  container_port = 8080
+}
+
 # ECS Fargate for Spring Boot Application
 module "ecs" {
   source = "./modules/ecs"
   
-  project_name     = var.project_name
-  environment      = var.environment
-  region           = var.aws_region
-  vpc_id           = module.vpc.vpc_id
-  public_subnets   = module.vpc.public_subnets
-  private_subnets  = module.vpc.private_subnets
-  public_sg_id     = module.security_groups.public_sg_id
+  project_name      = var.project_name
+  environment       = var.environment
+  region            = var.aws_region
+  vpc_id            = module.vpc.vpc_id
+  public_subnets    = module.vpc.public_subnets
+  private_subnets   = module.vpc.private_subnets
+  public_sg_id      = module.security_groups.public_sg_id
   application_sg_id = module.security_groups.application_sg_id
   
   # Container configuration
   container_port   = 8080
-  task_cpu         = 256
-  task_memory      = 512
+  task_cpu         = 1024
+  task_memory      = 2048
   app_count        = 1
+  
+  # App Mesh integration
+  service_mesh_enabled  = true
+  mesh_name             = module.app_mesh.mesh_name
+  virtual_node_name     = module.app_mesh.virtual_node_name
+  service_discovery_arn = module.app_mesh.service_discovery_service_arn
 }
 
 # API Gateway
@@ -107,4 +123,9 @@ output "api_gateway_endpoint" {
 output "alb_dns_name" {
   description = "The DNS name of the load balancer"
   value       = module.ecs.alb_dns_name
+}
+
+output "mesh_name" {
+  description = "The name of the App Mesh service mesh"
+  value       = module.app_mesh.mesh_name
 } 

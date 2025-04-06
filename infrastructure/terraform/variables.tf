@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_profile" {
+  description = "AWS CLI profile to use (optional, leave empty for GitHub Actions)"
+  type        = string
+  default     = ""
+}
+
 variable "environment" {
   description = "Environment name (e.g., dev, test, prod)"
   type        = string
