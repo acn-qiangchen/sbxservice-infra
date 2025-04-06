@@ -8,6 +8,8 @@ terraform {
     }
   }
   
+  # Comment out the S3 backend for now to use local backend for POC
+  /*
   backend "s3" {
     # These values should be replaced with actual values when setting up the environment
     # bucket = "sbxservice-terraform-state"
@@ -15,10 +17,12 @@ terraform {
     # region = "us-east-1"
     # dynamodb_table = "sbxservice-terraform-lock"
   }
+  */
 }
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = "sbxservice-poc"
   
   default_tags {
     tags = {
@@ -47,35 +51,37 @@ module "security_groups" {
   vpc_id      = module.vpc.vpc_id
 }
 
-# ECS/EKS Cluster (commented out until needed)
-# module "container_cluster" {
-#   source = "./modules/container_cluster"
-#   
-#   environment      = var.environment
-#   vpc_id           = module.vpc.vpc_id
-#   private_subnets  = module.vpc.private_subnets
-#   public_subnets   = module.vpc.public_subnets
-# }
-
-# RDS Database (commented out until needed)
-# module "database" {
-#   source = "./modules/database"
-#   
-#   environment     = var.environment
-#   vpc_id          = module.vpc.vpc_id
-#   private_subnets = module.vpc.private_subnets
-#   db_name         = var.db_name
-#   db_username     = var.db_username
-#   db_password     = var.db_password
-# }
+# ECS Fargate for Spring Boot Application
+module "ecs" {
+  source = "./modules/ecs"
+  
+  project_name     = var.project_name
+  environment      = var.environment
+  region           = var.aws_region
+  vpc_id           = module.vpc.vpc_id
+  public_subnets   = module.vpc.public_subnets
+  private_subnets  = module.vpc.private_subnets
+  public_sg_id     = module.security_groups.public_sg_id
+  application_sg_id = module.security_groups.application_sg_id
+  
+  # Container configuration
+  container_port   = 8080
+  task_cpu         = 256
+  task_memory      = 512
+  app_count        = 1
+}
 
 # API Gateway
-# module "api_gateway" {
-#   source = "./modules/api_gateway"
-#   
-#   environment = var.environment
-#   name        = "${var.project_name}-api"
-# }
+module "api_gateway" {
+  source = "./modules/api_gateway"
+  
+  project_name    = var.project_name
+  environment     = var.environment
+  public_subnets  = module.vpc.public_subnets
+  public_sg_id    = module.security_groups.public_sg_id
+  lb_listener_arn = module.ecs.lb_listener_arn
+  alb_dns_name    = module.ecs.alb_dns_name
+}
 
 # CloudWatch Log Groups
 resource "aws_cloudwatch_log_group" "app_logs" {
@@ -85,4 +91,20 @@ resource "aws_cloudwatch_log_group" "app_logs" {
   tags = {
     Name = "sbxservice-${var.environment}-logs"
   }
+}
+
+# Outputs
+output "ecr_repository_url" {
+  description = "The URL of the ECR repository"
+  value       = module.ecs.ecr_repository_url
+}
+
+output "api_gateway_endpoint" {
+  description = "The API Gateway endpoint URL"
+  value       = module.api_gateway.api_endpoint
+}
+
+output "alb_dns_name" {
+  description = "The DNS name of the load balancer"
+  value       = module.ecs.alb_dns_name
 } 

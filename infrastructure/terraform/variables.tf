@@ -25,9 +25,11 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "List of availability zones to use"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  default     = ["us-east-1a", "us-east-1b"]
 }
 
+# Database variables are commented out since we're not using a database in our POC
+/*
 variable "db_name" {
   description = "Name of the database"
   type        = string
@@ -46,4 +48,5 @@ variable "db_password" {
   type        = string
   sensitive   = true
   # Do not set a default value for passwords - should be provided via secure means
-} 
+}
+*/ 
