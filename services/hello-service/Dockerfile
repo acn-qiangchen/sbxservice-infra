@@ -15,6 +15,8 @@ FROM openjdk:17-slim
 WORKDIR /app
 # Add a non-root user
 RUN groupadd -r spring && useradd -r -g spring spring
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 USER spring:spring
 # Copy the JAR file from the build stage
 COPY --from=builder /app/target/*.jar app.jar
@@ -22,7 +24,7 @@ COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
 # Set healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
-  CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 # Run the application with proper JVM options
 ENTRYPOINT ["java", \

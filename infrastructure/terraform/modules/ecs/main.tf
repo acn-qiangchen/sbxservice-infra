@@ -146,6 +146,34 @@ resource "aws_iam_role_policy_attachment" "task_xray" {
   policy_arn = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
 }
 
+# Create a policy for ECS Exec
+resource "aws_iam_policy" "ecs_exec_policy" {
+  name        = "${var.project_name}-${var.environment}-ecs-exec-policy"
+  description = "Allow ECS Exec for task debugging"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach ECS Exec policy to task role
+resource "aws_iam_role_policy_attachment" "task_ecs_exec" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_exec_policy.arn
+}
+
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/${var.project_name}-${var.environment}"
@@ -390,6 +418,7 @@ resource "aws_ecs_service" "app" {
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = var.app_count
   launch_type     = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     security_groups  = [var.application_sg_id]

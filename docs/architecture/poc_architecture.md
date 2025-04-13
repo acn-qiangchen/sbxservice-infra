@@ -22,25 +22,36 @@ This document outlines a minimal viable architecture for the SBXService POC on A
                     │Firewall      │
                     └──────┬───────┘
                            │
-  ┌───────────────────────┼───────────────────────┐
-  │                       ▼                       │
-  │  ECS Cluster (Fargate)                        │
-  │  ┌───────────────────────────────────────┐    │
-  │  │                AWS App Mesh           │    │
-  │  │  ┌─────────────────────────────────┐  │    │
-  │  │  │ ┌─────────┐     ┌─────────────┐ │  │    │
-  │  │  │ │ Envoy   │     │ Spring Boot │ │  │    │
-  │  │  │ │ Proxy   ├────►│ Service     │ │  │    │
-  │  │  │ └─────────┘     └─────────────┘ │  │    │
-  │  │  │                                 │  │    │
-  │  │  │ ┌─────────┐                     │  │    │
-  │  │  │ │ X-Ray   │                     │  │    │
-  │  │  │ │ Daemon  │                     │  │    │
-  │  │  │ └─────────┘                     │  │    │
-  │  │  └─────────────────────────────────┘  │    │
-  │  └───────────────────────────────────────┘    │
-  │                                               │
-  └───────────────────────────────────────────────┘
+  ┌───────────────────────┼─────────────────────────┐
+  │                       ▼                         │
+  │  ECS Cluster (Fargate)                          │
+  │  ┌───────────────────────────────────────┐      │
+  │  │                AWS App Mesh           │      │
+  │  │  ┌─────────────────────────────────┐  │      │
+  │  │  │ ┌─────────┐     ┌─────────────┐ │  │      │
+  │  │  │ │ Envoy   │     │ Spring Boot │ │  │      │
+  │  │  │ │ Proxy   ├────►│ Service     │ │  │      │
+  │  │  │ └─────────┘     └─────────────┘ │  │      │
+  │  │  │                                 │  │      │
+  │  │  │ ┌─────────┐                     │  │      │
+  │  │  │ │ X-Ray   │                     │  │      │
+  │  │  │ │ Daemon  │                     │  │      │
+  │  │  │ └─────────┘                     │  │      │
+  │  │  └─────────────────────────────────┘  │      │
+  │  └───────────────────────────────────────┘      │
+  │                                                 │
+  │  ┌─────────────────────────────────────────┐    │
+  │  │             VPC Endpoints               │    │
+  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐    │    │
+  │  │  │ ECR API │ │ ECR DKR │ │   S3    │    │    │
+  │  │  └─────────┘ └─────────┘ └─────────┘    │    │
+  │  │                                         │    │
+  │  │  ┌─────────────────┐                    │    │
+  │  │  │ CloudWatch Logs │                    │    │
+  │  │  └─────────────────┘                    │    │
+  │  └─────────────────────────────────────────┘    │
+  │                                                 │
+  └─────────────────────────────────────────────────┘
 ```
 
 ## Core Components
@@ -65,7 +76,15 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Dedicated firewall subnet for Network Firewall endpoints
    - Advanced security inspection for north-south traffic
 
-4. **Networking & Security**
+4. **VPC Endpoints**
+   - Private connectivity to AWS services without traversing the public internet
+   - ECR API and ECR Docker Registry endpoints for container image pulls
+   - S3 Gateway endpoint for ECR layer storage access
+   - CloudWatch Logs endpoint for container logging
+   - Enhanced security by keeping traffic within AWS network
+   - Enables ECS tasks in private subnets to access AWS services through Network Firewall
+
+5. **Networking & Security**
    - VPC with public, private, and firewall subnets
    - Security groups for network traffic control
    - IAM roles for service permissions
@@ -105,6 +124,16 @@ The POC architecture employs a sophisticated traffic routing strategy via AWS Ne
    - Each AZ has independent traffic flows through dedicated firewall endpoints
    - Failure in one AZ doesn't impact traffic flow in other AZs
    - Ensures high availability and fault tolerance
+
+6. **VPC Endpoints for AWS Services Access**
+   - **Interface Endpoints** placed in private subnets for:
+     - ECR API: Enables authentication with ECR service
+     - ECR Docker Registry: Allows pulling container images
+     - CloudWatch Logs: Enables logging from containers without internet access
+   - **Gateway Endpoint** for S3 attached to private subnet route tables
+   - Enables ECS tasks in private subnets to access AWS services without traversing the public internet
+   - Maintains security boundaries by keeping AWS service traffic within AWS network
+   - Reduces exposure to potential threats while ensuring critical AWS services remain accessible
 
 ```
                              ┌─────────────────────┐
@@ -178,6 +207,7 @@ The POC architecture employs a sophisticated traffic routing strategy via AWS Ne
    - Deploy Network Firewall with security rules
    - Configure task definition with Envoy sidecar
    - Set up API Gateway with REST API type
+   - Create VPC endpoints for ECR, S3, and CloudWatch Logs services to enable private connectivity
 
 3. **CI/CD Pipeline**
    - Configure GitHub Actions workflow for:
@@ -203,6 +233,26 @@ The POC architecture employs a sophisticated traffic routing strategy via AWS Ne
    - Helps meet regulatory requirements for network security
    - Provides documentation for security audits
    - Supports security best practices
+
+## VPC Endpoints Benefits
+
+1. **Enhanced Security**
+   - Private connectivity to AWS services without traversing the public internet
+   - Reduced attack surface by eliminating the need for internet gateways for AWS service traffic
+   - Traffic remains within AWS network, improving security posture
+   - Control access with endpoint policies and security groups
+
+2. **Reliable Connectivity**
+   - Direct, private connectivity to AWS services
+   - Eliminates dependency on NAT gateways or internet gateways for AWS service traffic
+   - Reduces potential points of network failure
+   - Consistent performance with AWS's internal network
+
+3. **Cost Optimization**
+   - Eliminates data transfer costs through NAT gateways for AWS service traffic
+   - Reduces need for bandwidth allocation to internet gateways
+   - Simpler network architecture with fewer components to manage
+   - Per-hour pricing for interface endpoints with minimal data processing charges
 
 ## App Mesh Benefits
 
