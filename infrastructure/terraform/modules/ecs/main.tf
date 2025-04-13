@@ -140,11 +140,12 @@ resource "aws_iam_role_policy_attachment" "task_app_mesh" {
 }
 
 # Attach X-Ray permissions to the task role
-resource "aws_iam_role_policy_attachment" "task_xray" {
-  count      = var.service_mesh_enabled ? 1 : 0
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
-}
+# Commenting out as we're not using X-Ray for now
+# resource "aws_iam_role_policy_attachment" "task_xray" {
+#   count      = var.service_mesh_enabled ? 1 : 0
+#   role       = aws_iam_role.ecs_task_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+# }
 
 # Create a policy for ECS Exec
 resource "aws_iam_policy" "ecs_exec_policy" {
@@ -228,8 +229,8 @@ resource "aws_ecs_task_definition" "app" {
     {
       name      = "${var.project_name}-${var.environment}-container"
       image     = "${aws_ecr_repository.app.repository_url}:latest"
-      cpu       = var.task_cpu - 256 - 32 # Reserve some CPU for the Envoy proxy and X-Ray daemon
-      memory    = var.task_memory - 128 - 64 # Reserve some memory for the Envoy proxy and X-Ray daemon
+      cpu       = var.task_cpu - 256 # Reserve CPU for the Envoy proxy only
+      memory    = var.task_memory - 128 # Reserve memory for the Envoy proxy only
       essential = true
       portMappings = [
         {
@@ -281,7 +282,7 @@ resource "aws_ecs_task_definition" "app" {
         },
         {
           name  = "ENABLE_ENVOY_XRAY_TRACING"
-          value = "1"
+          value = "0"  # Disable X-Ray tracing in Envoy
         }
       ]
       healthCheck = {
@@ -297,29 +298,6 @@ resource "aws_ecs_task_definition" "app" {
           "awslogs-group"         = aws_cloudwatch_log_group.envoy[0].name
           "awslogs-region"        = var.region
           "awslogs-stream-prefix" = "envoy"
-        }
-      }
-    },
-    # X-Ray daemon container
-    {
-      name      = "xray-daemon"
-      image     = "amazon/aws-xray-daemon:latest"
-      essential = true
-      cpu       = 32
-      memory    = 64
-      portMappings = [
-        {
-          containerPort = 2000
-          hostPort      = 2000
-          protocol      = "udp"
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.app.name
-          "awslogs-region"        = var.region
-          "awslogs-stream-prefix" = "xray"
         }
       }
     }
@@ -370,6 +348,8 @@ resource "aws_lb" "main" {
   subnets            = var.public_subnets
 
   enable_deletion_protection = false
+  
+  enable_cross_zone_load_balancing = true
 
   tags = {
     Name = "${var.project_name}-${var.environment}-alb"
@@ -385,7 +365,7 @@ resource "aws_lb_target_group" "app" {
   target_type = "ip"
 
   health_check {
-    healthy_threshold   = 3
+    healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 5
     interval            = 30

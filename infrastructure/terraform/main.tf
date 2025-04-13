@@ -99,7 +99,7 @@ module "ecs" {
   container_port   = 8080
   task_cpu         = 1024
   task_memory      = 2048
-  app_count        = 1
+  app_count        = 2
   
   # App Mesh integration
   service_mesh_enabled  = true
@@ -159,4 +159,14 @@ output "network_firewall_status" {
 output "firewall_policy_id" {
   description = "ID of the Network Firewall Policy"
   value       = module.network_firewall.firewall_policy_id
+}
+
+output "network_firewall_flow_logs" {
+  description = "CloudWatch Log Group for Network Firewall flow logs"
+  value       = module.network_firewall.flow_log_group
+}
+
+output "network_firewall_alert_logs" {
+  description = "CloudWatch Log Group for Network Firewall alert logs"
+  value       = module.network_firewall.alert_log_group
 } 
