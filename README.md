@@ -1,15 +1,17 @@
-# SBXService POC
+# SBXService Infrastructure
 
-A simple Spring Boot Hello World application deployed on AWS ECS Fargate with API Gateway.
+This repository contains the infrastructure code for deploying the SBXService platform on AWS. It uses Terraform to provision and manage AWS resources including ECS Fargate, App Mesh, Network Firewall, and API Gateway.
 
 ## Architecture
 
-This POC implements a minimal architecture with the following components:
+This infrastructure implements a minimal architecture with the following components:
 
-- Spring Boot service running on AWS ECS Fargate
+- AWS ECS Fargate for container orchestration
 - Amazon API Gateway for API access
 - AWS Application Load Balancer
-- Amazon CloudWatch for basic monitoring
+- AWS App Mesh for service mesh capabilities
+- AWS Network Firewall for security
+- Amazon CloudWatch for monitoring
 
 For architecture details, see [POC Architecture](docs/architecture/poc_architecture.md).
 
@@ -28,43 +30,20 @@ For architecture details, see [POC Architecture](docs/architecture/poc_architect
 │       │   └── vpc/              # VPC module
 │       ├── main.tf               # Main Terraform configuration
 │       └── variables.tf          # Terraform variables
-├── services/                     # Service directories
-│   └── hello-service/            # Spring Boot Hello World service
-├── src/                          # Spring Boot application source code
-└── Dockerfile                    # Docker configuration for containerization
 ```
+
+## Application Services
+
+The application services are now maintained in a separate repository: [SBXService Applications](https://github.com/your-org/sbxservice-apps).
 
 ## Getting Started
 
 ### Prerequisites
 
-- Java 17 or later
-- Maven 3.8 or later
-- Docker
 - AWS CLI configured with appropriate credentials
 - Terraform 1.0.0 or later
 
-### Building the Application
-
-1. Build the Spring Boot application:
-
-```bash
-cd services/hello-service
-./mvnw clean package
-```
-
-2. Build the Docker image:
-
-```bash
-# IMPORTANT: When building on Apple Silicon (M1/M2 Macs), you must specify the target platform
-# for compatibility with AWS Fargate which uses x86/amd64
-docker buildx build --platform linux/amd64 -t hello-service .
-
-# On Intel/AMD machines, you can use the standard build command
-# docker build -t hello-service .
-```
-
-### Deploying to AWS
+### Deploying Infrastructure
 
 1. Initialize Terraform:
 
@@ -80,45 +59,27 @@ terraform init
 terraform apply
 ```
 
-3. After successful deployment, get the ECR repository URL:
-
-```bash
-export ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
-```
-
-4. Tag and push your Docker image:
-
-```bash
-# Make sure to use the correct AWS profile
-aws ecr get-login-password --region us-east-1 --profile your-aws-profile | docker login --username AWS --password-stdin $ECR_REPO_URL
-docker tag hello-service:latest $ECR_REPO_URL:latest
-docker push $ECR_REPO_URL:latest
-```
-
-5. Access your API via the API Gateway URL:
-
-```bash
-echo "API Gateway URL: $(terraform output -raw api_gateway_endpoint)"
-```
-
 ## Common Issues and Troubleshooting
 
-### Platform Compatibility Issues
+### AWS Profile
 
-If you encounter an error like:
-```
-CannotPullContainerError: pull image manifest has been retried 5 time(s): image Manifest does not contain descriptor matching platform 'linux/amd64'
-```
-
-This is due to a platform mismatch between your build environment (especially on Apple Silicon Macs) and AWS Fargate, which uses x86/amd64 architecture. Ensure you build your Docker image with the correct platform flag:
+When executing AWS CLI commands, always check if AWS_PROFILE environment variable exists. If AWS_PROFILE does not exist, set it:
 
 ```bash
-docker buildx build --platform linux/amd64 -t hello-service .
+export AWS_PROFILE=your-profile-name
+```
+
+### Platform Compatibility
+
+When building Docker images, always set the `platform` flag to the appropriate value for AWS Fargate:
+
+```bash
+docker buildx build --platform linux/amd64 -t your-service .
 ```
 
 ## Clean Up
 
-To destroy all AWS resources created for this POC:
+To destroy all AWS resources:
 
 ```bash
 cd infrastructure/terraform
