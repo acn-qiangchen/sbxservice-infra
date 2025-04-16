@@ -9,9 +9,6 @@ resource "aws_networkfirewall_firewall_policy" "main" {
     stateless_default_actions          = ["aws:forward_to_sfe"]
     stateless_fragment_default_actions = ["aws:forward_to_sfe"]
     
-    # stateful_rule_group_reference {
-    #   resource_arn = aws_networkfirewall_rule_group.suricata_compatible.arn
-    # }
     policy_variables {
       rule_variables {
           key = "HOME_NET"
@@ -24,7 +21,12 @@ resource "aws_networkfirewall_firewall_policy" "main" {
     stateful_engine_options {
       rule_order = "STRICT_ORDER"
     }
-
+    
+    stateful_rule_group_reference {
+      resource_arn = aws_networkfirewall_rule_group.custom_http_headers.arn
+      priority     = 5
+    }
+    
     stateful_rule_group_reference {
       resource_arn = "arn:aws:network-firewall:${data.aws_region.current.name}:aws-managed:stateful-rulegroup/ThreatSignaturesScannersStrictOrder"
       priority     = 10
@@ -36,44 +38,35 @@ resource "aws_networkfirewall_firewall_policy" "main" {
   }
 }
 
-# AWS Network Firewall with AWS Managed Suricata-compatible rule group
-# resource "aws_networkfirewall_rule_group" "suricata_compatible" {
-#   capacity = 100
-#   name     = "${var.project_name}-${var.environment}-suricata-rules"
-#   type     = "STATEFUL"
+# Custom rule group for HTTP header inspection
+resource "aws_networkfirewall_rule_group" "custom_http_headers" {
+  capacity = 100
+  name     = "${var.project_name}-${var.environment}-http-headers"
+  type     = "STATEFUL"
   
-#   rule_group {
-#     rule_variables {
-#       ip_sets {
-#         key = "HOME_NET"
-#         ip_set {
-#           definition = [var.vpc_cidr]
-#         }
-#       }
-#     }
+  rule_group {
+    rules_source {
+      rules_string = <<EOF
+# Block HTTP requests with 'attack' header
+drop http any any -> $HOME_NET any (msg:"Attack header detected"; flow:established,to_server; http.header; content:"attack"; nocase; sid:1000001; rev:1;)
+
+# Additional HTTP header inspection rules
+drop http any any -> $HOME_NET any (msg:"Malicious header detected - XSS attempt"; flow:established,to_server; http.header; content:"<script>"; nocase; sid:1000002; rev:1;)
+
+# Block requests with specific query parameters
+drop http any any -> $HOME_NET any (msg:"SQL Injection attempt in query"; flow:established,to_server; http.uri; content:"union"; nocase; content:"select"; nocase; sid:1000003; rev:1;)
+EOF
+    }
     
-#     rules_source {
-#       rules_string = <<EOF
-# # Suricata compatible rules
-# # Block known malicious user agents
-# alert http any any -> $HOME_NET any (msg:"Potentially malicious user agent detected"; flow:established,to_server; http.user_agent; content:"malicious"; nocase; sid:1000001; rev:1;)
+    stateful_rule_options {
+      rule_order = "STRICT_ORDER"
+    }
+  }
 
-# # Detect potential SQL injection attempts
-# alert http any any -> $HOME_NET any (msg:"SQL Injection attempt detected"; flow:established,to_server; http.uri; content:"union"; nocase; pcre:"/union\s+select/i"; sid:1000002; rev:1;)
-
-# # Block known malicious IP ranges (example)
-# alert ip [192.168.1.0/24,10.0.0.0/8] any -> $HOME_NET any (msg:"Connection attempt from suspicious IP"; sid:1000003; rev:1;)
-
-# # HTTP protocol compliance check
-# alert http any any -> $HOME_NET any (msg:"HTTP Protocol Violation"; flow:established,to_server; http.method; content:!"GET"; content:!"POST"; content:!"PUT"; content:!"DELETE"; content:!"HEAD"; content:!"OPTIONS"; content:!"CONNECT"; content:!"TRACE"; sid:1000004; rev:1;)
-# EOF
-#     }
-#   }
-
-#   tags = {
-#     Name = "${var.project_name}-${var.environment}-suricata-rules"
-#   }
-# }
+  tags = {
+    Name = "${var.project_name}-${var.environment}-http-headers"
+  }
+}
 
 # AWS Network Firewall
 resource "aws_networkfirewall_firewall" "main" {
@@ -92,6 +85,48 @@ resource "aws_networkfirewall_firewall" "main" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-network-firewall"
+  }
+}
+
+# CloudWatch Log Groups for Network Firewall logs
+resource "aws_cloudwatch_log_group" "network_firewall_flow" {
+  name              = "/aws/network-firewall/${var.project_name}-${var.environment}/flow"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-network-firewall-flow-logs"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "network_firewall_alert" {
+  name              = "/aws/network-firewall/${var.project_name}-${var.environment}/alert"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-network-firewall-alert-logs"
+  }
+}
+
+# Configure Network Firewall logging
+resource "aws_networkfirewall_logging_configuration" "main" {
+  firewall_arn = aws_networkfirewall_firewall.main.arn
+  
+  logging_configuration {
+    log_destination_config {
+      log_destination = {
+        logGroup = aws_cloudwatch_log_group.network_firewall_flow.name
+      }
+      log_destination_type = "CloudWatchLogs"
+      log_type             = "FLOW"
+    }
+    
+    log_destination_config {
+      log_destination = {
+        logGroup = aws_cloudwatch_log_group.network_firewall_alert.name
+      }
+      log_destination_type = "CloudWatchLogs"
+      log_type             = "ALERT"
+    }
   }
 }
 
