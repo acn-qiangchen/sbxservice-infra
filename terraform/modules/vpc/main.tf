@@ -122,7 +122,7 @@ resource "aws_route" "firewall_nat_gateway" {
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.main[index(var.availability_zones, each.key)].id
-  
+
   # In case of conflict with existing routes
   lifecycle {
     create_before_destroy = true
