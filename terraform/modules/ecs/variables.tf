@@ -38,6 +38,18 @@ variable "application_sg_id" {
   type        = string
 }
 
+variable "container_image_url" {
+  description = "URL of the container image in ECR"
+  type        = string
+  default     = ""
+}
+
+variable "container_images" {
+  description = "Map of container images for different services"
+  type        = map(string)
+  default     = {}
+}
+
 variable "task_cpu" {
   description = "CPU units for the task (256 = 0.25 vCPU)"
   type        = number

@@ -33,6 +33,19 @@ provider "aws" {
   }
 }
 
+# Construct container_images map from individual image variables
+locals {
+  container_images = merge(
+    var.container_images,
+    {
+      for k, v in {
+        hello = var.container_image_hello,
+      } : k => v if v != ""
+    },
+    var.container_image_url != "" ? { hello = var.container_image_url } : {}
+  )
+}
+
 # VPC and Network Configuration
 module "vpc" {
   source = "./modules/vpc"
@@ -96,6 +109,7 @@ module "ecs" {
   application_sg_id = module.security_groups.application_sg_id
   
   # Container configuration
+  container_image_url = lookup(local.container_images, "hello", "")
   container_port   = 8080
   task_cpu         = 1024
   task_memory      = 2048
@@ -131,11 +145,6 @@ resource "aws_cloudwatch_log_group" "app_logs" {
 }
 
 # Outputs
-output "ecr_repository_url" {
-  description = "The URL of the ECR repository"
-  value       = module.ecs.ecr_repository_url
-}
-
 output "api_gateway_endpoint" {
   description = "The API Gateway endpoint URL"
   value       = module.api_gateway.api_endpoint
@@ -169,4 +178,10 @@ output "network_firewall_flow_logs" {
 output "network_firewall_alert_logs" {
   description = "CloudWatch Log Group for Network Firewall alert logs"
   value       = module.network_firewall.alert_log_group
+}
+
+# Output container images being used
+output "container_images" {
+  description = "Map of container images being used for each service"
+  value       = local.container_images
 } 

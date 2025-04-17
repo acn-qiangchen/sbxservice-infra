@@ -1,16 +1,4 @@
-# ECR Repository
-resource "aws_ecr_repository" "app" {
-  name                 = "${var.project_name}-${var.environment}-repo"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-ecr"
-  }
-}
+# ECS module without ECR - ECR has been moved to another repository
 
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
@@ -139,14 +127,6 @@ resource "aws_iam_role_policy_attachment" "task_app_mesh" {
   policy_arn = aws_iam_policy.app_mesh_policy[0].arn
 }
 
-# Attach X-Ray permissions to the task role
-# Commenting out as we're not using X-Ray for now
-# resource "aws_iam_role_policy_attachment" "task_xray" {
-#   count      = var.service_mesh_enabled ? 1 : 0
-#   role       = aws_iam_role.ecs_task_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
-# }
-
 # Create a policy for ECS Exec
 resource "aws_iam_policy" "ecs_exec_policy" {
   name        = "${var.project_name}-${var.environment}-ecs-exec-policy"
@@ -228,7 +208,7 @@ resource "aws_ecs_task_definition" "app" {
     # Application container
     {
       name      = "${var.project_name}-${var.environment}-container"
-      image     = "${aws_ecr_repository.app.repository_url}:latest"
+      image     = "${var.container_image_url}:latest"
       cpu       = var.task_cpu - 256 # Reserve CPU for the Envoy proxy only
       memory    = var.task_memory - 128 # Reserve memory for the Envoy proxy only
       essential = true
@@ -267,14 +247,31 @@ resource "aws_ecs_task_definition" "app" {
         }
       ]
     },
-    # Envoy proxy container
+    # Envoy Proxy for App Mesh
     {
       name      = "envoy"
-      image     = "840364872350.dkr.ecr.${var.region}.amazonaws.com/aws-appmesh-envoy:v1.18.3.0-prod"
+      image     = "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.24.0.0-prod"
       essential = true
+      user      = "1337"
       cpu       = 256
       memory    = 128
-      user      = "1337"
+      portMappings = [
+        {
+          containerPort = 9901
+          hostPort      = 9901
+          protocol      = "tcp"
+        },
+        {
+          containerPort = 15000
+          hostPort      = 15000
+          protocol      = "tcp"
+        },
+        {
+          containerPort = 15001
+          hostPort      = 15001
+          protocol      = "tcp"
+        }
+      ]
       environment = [
         {
           name  = "APPMESH_VIRTUAL_NODE_NAME"
@@ -282,16 +279,9 @@ resource "aws_ecs_task_definition" "app" {
         },
         {
           name  = "ENABLE_ENVOY_XRAY_TRACING"
-          value = "0"  # Disable X-Ray tracing in Envoy
+          value = "1"
         }
       ]
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"]
-        interval    = 5
-        timeout     = 2
-        retries     = 3
-        startPeriod = 10
-      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -300,12 +290,19 @@ resource "aws_ecs_task_definition" "app" {
           "awslogs-stream-prefix" = "envoy"
         }
       }
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"]
+        interval    = 5
+        retries     = 3
+        timeout     = 2
+        startPeriod = 10
+      }
     }
   ]) : jsonencode([
-    # Standard container without App Mesh
+    # Simple configuration without App Mesh
     {
       name      = "${var.project_name}-${var.environment}-container"
-      image     = "${aws_ecr_repository.app.repository_url}:latest"
+      image     = "${var.container_image_url}:latest"
       cpu       = var.task_cpu
       memory    = var.task_memory
       essential = true
@@ -327,15 +324,15 @@ resource "aws_ecs_task_definition" "app" {
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}/actuator/health || exit 1"]
         interval    = 30
-        timeout     = 5
         retries     = 3
+        timeout     = 5
         startPeriod = 60
       }
     }
   ])
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-task-definition"
+    Name = "${var.project_name}-${var.environment}-task"
   }
 }
 
@@ -365,21 +362,20 @@ resource "aws_lb_target_group" "app" {
   target_type = "ip"
 
   health_check {
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 30
     path                = "/actuator/health"
-    port                = "traffic-port"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
     matcher             = "200"
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-target-group"
+    Name = "${var.project_name}-${var.environment}-tg"
   }
 }
 
-# Listener for ALB
+# ALB Listener
 resource "aws_lb_listener" "front_end" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -393,12 +389,15 @@ resource "aws_lb_listener" "front_end" {
 
 # ECS Service
 resource "aws_ecs_service" "app" {
-  name            = "${var.project_name}-${var.environment}-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = var.app_count
-  launch_type     = "FARGATE"
-  enable_execute_command = true
+  name                               = "${var.project_name}-${var.environment}-service"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.app.arn
+  desired_count                      = var.app_count
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+  launch_type                        = "FARGATE"
+  scheduling_strategy                = "REPLICA"
+  enable_execute_command             = true
 
   network_configuration {
     security_groups  = [var.application_sg_id]
@@ -412,9 +411,9 @@ resource "aws_ecs_service" "app" {
     container_port   = var.container_port
   }
 
-  # Service discovery registration for App Mesh
+  # Add service discovery for App Mesh if enabled
   dynamic "service_registries" {
-    for_each = var.service_mesh_enabled ? [1] : []
+    for_each = var.service_mesh_enabled && var.service_discovery_arn != "" ? [1] : []
     content {
       registry_arn = var.service_discovery_arn
     }

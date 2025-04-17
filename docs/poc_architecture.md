@@ -179,7 +179,34 @@ The POC architecture employs a sophisticated traffic routing strategy via AWS Ne
                                                                                                                  ← Return Traffic
 ```
 
-6. **Monitoring**
+## Container Image Management
+
+**Important Update:** ECR repository resources have been moved to a separate repository for better management. The infrastructure now expects:
+
+1. Container images to be managed externally
+2. Currently, there is one service called "hello-service" with the container image specified via the `container_image_hello` variable
+3. The infrastructure is designed to be easily extended to support multiple services in the future
+
+Example of providing the hello-service container image:
+
+```hcl
+# Direct variable assignment
+container_image_hello = "123456789012.dkr.ecr.us-east-1.amazonaws.com/hello-service:latest"
+
+# Or through the command line
+terraform apply -var="container_image_hello=123456789012.dkr.ecr.us-east-1.amazonaws.com/hello-service:latest"
+```
+
+For backward compatibility, the `container_image_url` variable is still supported but deprecated.
+
+This service-specific suffix naming approach enables:
+- Clear identification of which container image is for which service
+- Easy extension for additional services in the future by adding new variables with appropriate suffixes
+- Support for task definitions with multiple containers when needed
+- Cleaner separation of concerns between infrastructure and application code
+
+## Monitoring
+
    - Basic CloudWatch metrics for service monitoring
    - Container logs sent to CloudWatch Logs
    - Distributed tracing with AWS X-Ray
@@ -201,7 +228,6 @@ The POC architecture employs a sophisticated traffic routing strategy via AWS Ne
    - Containerize using Docker (create Dockerfile)
 
 2. **AWS Infrastructure Setup**
-   - Create ECR repository for container images
    - Set up ECS cluster with Fargate launch type
    - Configure App Mesh service mesh
    - Deploy Network Firewall with security rules
@@ -210,7 +236,7 @@ The POC architecture employs a sophisticated traffic routing strategy via AWS Ne
    - Create VPC endpoints for ECR, S3, and CloudWatch Logs services to enable private connectivity
 
 3. **CI/CD Pipeline**
-   - Configure GitHub Actions workflow for:
+   - Configure CI/CD workflows for:
      - Building the Spring Boot application
      - Creating and pushing Docker image to ECR
      - Deploying updated task definition to ECS

@@ -22,6 +22,27 @@ variable "project_name" {
   default     = "sbxservice"
 }
 
+# Container image variables with service-specific suffixes
+variable "container_image_hello" {
+  description = "URL of the container image for the hello-service"
+  type        = string
+  default     = ""
+}
+
+# Map of all container images (constructed from individual image variables)
+variable "container_images" {
+  description = "Map of container images for different services (derived from container_image_* variables)"
+  type        = map(string)
+  default     = {}
+}
+
+# Keeping for backward compatibility
+variable "container_image_url" {
+  description = "URL of the main container image in ECR (from another repository) - DEPRECATED: use container_image_hello instead"
+  type        = string
+  default     = ""
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
