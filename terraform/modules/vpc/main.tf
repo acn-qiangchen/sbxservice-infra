@@ -45,6 +45,34 @@ resource "aws_subnet" "firewall" {
   }
 }
 
+# Create route tables for firewall subnets per AZ
+resource "aws_route_table" "firewall" {
+  for_each = { for i, az in var.availability_zones : az => i if i < length(var.firewall_subnet_cidrs) }
+  vpc_id   = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-firewall-rt-${each.key}"
+  }
+}
+
+# Add route to NAT Gateway for each firewall route table
+resource "aws_route" "firewall_nat_gateway" {
+  for_each = aws_route_table.firewall
+  
+  route_table_id         = each.value.id
+  destination_cidr_block = "0.0.0.0/0"
+  
+  # Use the NAT Gateway in the same AZ
+  nat_gateway_id = each.key == var.availability_zones[0] ? aws_nat_gateway.nat_az1.id : aws_nat_gateway.nat_az2.id
+}
+
+# Associate firewall subnets with corresponding AZ route table
+resource "aws_route_table_association" "firewall" {
+  count          = length(var.firewall_subnet_cidrs)
+  subnet_id      = aws_subnet.firewall[count.index].id
+  route_table_id = aws_route_table.firewall[var.availability_zones[count.index % length(var.availability_zones)]].id
+}
+
 # Internet Gateway
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
@@ -54,22 +82,41 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Elastic IP for NAT Gateway
-resource "aws_eip" "nat" {
+# Elastic IP for NAT Gateway in AZ1
+resource "aws_eip" "nat_az1" {
   domain = "vpc"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nat-eip"
+    Name = "${var.project_name}-${var.environment}-nat-eip-az1"
   }
 }
 
-# NAT Gateway
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
+# Elastic IP for NAT Gateway in AZ2
+resource "aws_eip" "nat_az2" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-nat-eip-az2"
+  }
+}
+
+# NAT Gateway in AZ1
+resource "aws_nat_gateway" "nat_az1" {
+  allocation_id = aws_eip.nat_az1.id
   subnet_id     = aws_subnet.public[0].id
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nat"
+    Name = "${var.project_name}-${var.environment}-nat-az1"
+  }
+}
+
+# NAT Gateway in AZ2
+resource "aws_nat_gateway" "nat_az2" {
+  allocation_id = aws_eip.nat_az2.id
+  subnet_id     = aws_subnet.public[1].id
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-nat-az2"
   }
 }
 
@@ -99,14 +146,6 @@ resource "aws_route" "public_internet_gateway" {
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.main.id
-}
-
-# Add route to NAT Gateway for each private route table
-resource "aws_route" "private_nat_gateway" {
-  for_each               = aws_route_table.private
-  route_table_id         = each.value.id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.main.id
 }
 
 # Associate public subnets with corresponding AZ route table

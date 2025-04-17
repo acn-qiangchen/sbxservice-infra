@@ -73,7 +73,7 @@ module "network_firewall" {
   private_subnet_cidrs       = module.vpc.private_subnet_cidrs
   public_route_tables_by_az  = module.vpc.public_route_tables_by_az
   private_route_tables_by_az = module.vpc.private_route_tables_by_az
-  nat_gateway_id             = module.vpc.nat_gateway_id
+  nat_gateway_ids_by_az      = module.vpc.nat_gateway_ids_by_az
   availability_zones         = var.availability_zones
 }
 

@@ -44,8 +44,14 @@ variable "private_route_tables_by_az" {
 }
 
 variable "nat_gateway_id" {
-  description = "ID of the NAT Gateway"
+  description = "ID of the NAT Gateway (legacy, kept for backwards compatibility)"
   type        = string
+  default     = ""
+}
+
+variable "nat_gateway_ids_by_az" {
+  description = "Map of availability zone to NAT Gateway IDs"
+  type        = map(string)
 }
 
 variable "availability_zones" {
