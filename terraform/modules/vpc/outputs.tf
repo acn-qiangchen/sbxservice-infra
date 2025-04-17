@@ -29,18 +29,8 @@ output "private_subnet_cidrs" {
 }
 
 output "nat_gateway_id" {
-  description = "ID of the primary NAT Gateway (for backwards compatibility)"
-  value       = aws_nat_gateway.main[0].id
-}
-
-output "nat_gateway_ids" {
-  description = "List of all NAT Gateway IDs"
-  value       = aws_nat_gateway.main[*].id
-}
-
-output "nat_gateway_ids_by_az" {
-  description = "Map of AZ to NAT Gateway IDs"
-  value       = { for i, az in var.availability_zones : az => aws_nat_gateway.main[i].id }
+  description = "ID of the NAT Gateway"
+  value       = aws_nat_gateway.main.id
 }
 
 output "internet_gateway_id" {
@@ -56,9 +46,4 @@ output "public_route_tables_by_az" {
 output "private_route_tables_by_az" {
   description = "Map of AZ to private route table IDs"
   value       = { for az, rt in aws_route_table.private : az => rt.id }
-}
-
-output "firewall_route_tables_by_az" {
-  description = "Map of AZ to firewall route table IDs"
-  value       = { for az, rt in aws_route_table.firewall : az => rt.id }
 } 
