@@ -17,11 +17,10 @@ on:
         required: false
         type: string
         default: 'latest'
-      ecr_account_id:
-        description: 'AWS account ID hosting the ECR repository'
-        required: false
+      aws_account_id:
+        description: 'AWS account ID for assuming the IAM role and ECR'
+        required: true
         type: string
-        default: ''
 
 env:
   AWS_REGION: us-east-1
@@ -46,7 +45,7 @@ jobs:
     - name: Configure AWS credentials with OIDC
       uses: aws-actions/configure-aws-credentials@v2
       with:
-        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+        role-to-assume: arn:aws:iam::${{ github.event.inputs.aws_account_id }}:role/github-actions-role
         aws-region: ${{ env.AWS_REGION }}
     
     - name: Verify AWS credentials
@@ -73,15 +72,8 @@ jobs:
     - name: Construct Container Image URL
       id: image-url
       run: |
-        # If ECR account ID is not provided, try to use the AWS account ID from the role
-        if [ -z "${{ github.event.inputs.ecr_account_id }}" ]; then
-          ECR_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-        else
-          ECR_ACCOUNT_ID="${{ github.event.inputs.ecr_account_id }}"
-        fi
-        
         # Construct ECR URL using standard format
-        IMAGE_URL="${ECR_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ github.event.inputs.tag }}"
+        IMAGE_URL="${{ github.event.inputs.aws_account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ github.event.inputs.tag }}"
         
         echo "Container image URL: ${IMAGE_URL}"
         echo "image_url=${IMAGE_URL}" >> $GITHUB_OUTPUT
