@@ -25,6 +25,7 @@ on:
 env:
   AWS_REGION: us-east-1
   TF_VERSION: 1.5.0
+  # Ensure ECR repo name doesn't include any tags
   ECR_REPO_NAME: sbxservice-hello-service
   SERVICE_NAME: hello-service
 
@@ -72,8 +73,16 @@ jobs:
     - name: Construct Container Image URL
       id: image-url
       run: |
-        # Construct ECR URL using standard format
-        IMAGE_URL="${{ github.event.inputs.aws_account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ github.event.inputs.tag }}"
+        # Debug info
+        echo "AWS Account ID: ${{ github.event.inputs.aws_account_id }}"
+        echo "ECR Repo Name: ${{ env.ECR_REPO_NAME }}"
+        echo "Tag: ${{ github.event.inputs.tag }}"
+        
+        # Ensure the tag is properly set
+        IMAGE_TAG="${{ github.event.inputs.tag }}"
+        
+        # Construct ECR URL using standard format with explicit tag
+        IMAGE_URL="${{ github.event.inputs.aws_account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${IMAGE_TAG}"
         
         echo "Container image URL: ${IMAGE_URL}"
         echo "image_url=${IMAGE_URL}" >> $GITHUB_OUTPUT

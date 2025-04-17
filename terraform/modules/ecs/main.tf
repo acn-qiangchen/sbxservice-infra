@@ -208,7 +208,7 @@ resource "aws_ecs_task_definition" "app" {
     # Application container
     {
       name      = "${var.project_name}-${var.environment}-container"
-      image     = "${var.container_image_url}:latest"
+      image     = var.container_image_url
       cpu       = var.task_cpu - 256    # Reserve CPU for the Envoy proxy only
       memory    = var.task_memory - 128 # Reserve memory for the Envoy proxy only
       essential = true
@@ -302,7 +302,7 @@ resource "aws_ecs_task_definition" "app" {
     # Simple configuration without App Mesh
     {
       name      = "${var.project_name}-${var.environment}-container"
-      image     = "${var.container_image_url}:latest"
+      image     = var.container_image_url
       cpu       = var.task_cpu
       memory    = var.task_memory
       essential = true
