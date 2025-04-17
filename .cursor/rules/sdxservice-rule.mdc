@@ -13,4 +13,5 @@ alwaysApply: true
 - when executing aws cli, always check if AWS_PROFILE environment variable exists. if AWS_PROFILE does not exist, note the user to set it.
 - when architecture is changed. alwasy remember to update architecture blueprint documents under docs/architecture directory.
 - when build docker image, alwasy keep in mind set the `platform` flag to proper value.
+- when generate git commit message, use japanese
 

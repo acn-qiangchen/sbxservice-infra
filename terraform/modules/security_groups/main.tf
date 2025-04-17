@@ -52,11 +52,11 @@ resource "aws_security_group" "application" {
 
   # Allow internal traffic within this security group
   ingress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    self            = true
-    description     = "Allow internal traffic within this security group"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+    description = "Allow internal traffic within this security group"
   }
 
   egress {

@@ -128,7 +128,7 @@ resource "aws_service_discovery_service" "service" {
 
   dns_config {
     namespace_id = aws_service_discovery_private_dns_namespace.service_discovery.id
-    
+
     dns_records {
       ttl  = 10
       type = "A"

@@ -8,25 +8,25 @@ resource "aws_networkfirewall_firewall_policy" "main" {
   firewall_policy {
     stateless_default_actions          = ["aws:forward_to_sfe"]
     stateless_fragment_default_actions = ["aws:forward_to_sfe"]
-    
+
     policy_variables {
       rule_variables {
-          key = "HOME_NET"
-          ip_set {
-            definition = var.private_subnet_cidrs
-          }
+        key = "HOME_NET"
+        ip_set {
+          definition = var.private_subnet_cidrs
+        }
       }
     }
 
     stateful_engine_options {
       rule_order = "STRICT_ORDER"
     }
-    
+
     stateful_rule_group_reference {
       resource_arn = aws_networkfirewall_rule_group.custom_http_headers.arn
       priority     = 5
     }
-    
+
     stateful_rule_group_reference {
       resource_arn = "arn:aws:network-firewall:${data.aws_region.current.name}:aws-managed:stateful-rulegroup/ThreatSignaturesScannersStrictOrder"
       priority     = 10
@@ -43,7 +43,7 @@ resource "aws_networkfirewall_rule_group" "custom_http_headers" {
   capacity = 100
   name     = "${var.project_name}-${var.environment}-http-headers"
   type     = "STATEFUL"
-  
+
   rule_group {
     rules_source {
       rules_string = <<EOF
@@ -57,7 +57,7 @@ drop http any any -> $HOME_NET any (msg:"Malicious header detected - XSS attempt
 drop http any any -> $HOME_NET any (msg:"SQL Injection attempt in query"; flow:established,to_server; http.uri; content:"union"; nocase; content:"select"; nocase; sid:1000003; rev:1;)
 EOF
     }
-    
+
     stateful_rule_options {
       rule_order = "STRICT_ORDER"
     }
@@ -73,9 +73,9 @@ resource "aws_networkfirewall_firewall" "main" {
   name                = "${var.project_name}-${var.environment}-network-firewall"
   firewall_policy_arn = aws_networkfirewall_firewall_policy.main.arn
   vpc_id              = var.vpc_id
-  
-  delete_protection   = false
-  
+
+  delete_protection = false
+
   dynamic "subnet_mapping" {
     for_each = var.firewall_subnet_ids
     content {
@@ -110,7 +110,7 @@ resource "aws_cloudwatch_log_group" "network_firewall_alert" {
 # Configure Network Firewall logging
 resource "aws_networkfirewall_logging_configuration" "main" {
   firewall_arn = aws_networkfirewall_firewall.main.arn
-  
+
   logging_configuration {
     log_destination_config {
       log_destination = {
@@ -119,7 +119,7 @@ resource "aws_networkfirewall_logging_configuration" "main" {
       log_destination_type = "CloudWatchLogs"
       log_type             = "FLOW"
     }
-    
+
     log_destination_config {
       log_destination = {
         logGroup = aws_cloudwatch_log_group.network_firewall_alert.name

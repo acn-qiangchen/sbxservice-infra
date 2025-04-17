@@ -2,7 +2,7 @@
 resource "aws_api_gateway_rest_api" "api" {
   name        = "${var.project_name}-${var.environment}-api"
   description = "REST API for ${var.project_name} ${var.environment}"
-  
+
   endpoint_configuration {
     types = ["REGIONAL"]
   }
@@ -22,10 +22,10 @@ resource "aws_api_gateway_method" "root_method" {
 
 # Root resource integration with ALB
 resource "aws_api_gateway_integration" "root_integration" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_rest_api.api.root_resource_id
-  http_method   = aws_api_gateway_method.root_method.http_method
-  
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_rest_api.api.root_resource_id
+  http_method = aws_api_gateway_method.root_method.http_method
+
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
   uri                     = "http://${var.alb_dns_name}/"
@@ -44,7 +44,7 @@ resource "aws_api_gateway_method" "proxy_method" {
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
   authorization = "NONE"
-  
+
   request_parameters = {
     "method.request.path.proxy" = true
   }
@@ -52,14 +52,14 @@ resource "aws_api_gateway_method" "proxy_method" {
 
 # Proxy resource integration with ALB
 resource "aws_api_gateway_integration" "proxy_integration" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = aws_api_gateway_method.proxy_method.http_method
-  
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.proxy.id
+  http_method = aws_api_gateway_method.proxy_method.http_method
+
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
   uri                     = "http://${var.alb_dns_name}/{proxy}"
-  
+
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"
   }
@@ -71,10 +71,10 @@ resource "aws_api_gateway_deployment" "deployment" {
     aws_api_gateway_integration.root_integration,
     aws_api_gateway_integration.proxy_integration
   ]
-  
+
   rest_api_id = aws_api_gateway_rest_api.api.id
   stage_name  = var.environment
-  
+
   lifecycle {
     create_before_destroy = true
   }

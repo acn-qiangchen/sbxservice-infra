@@ -1,13 +1,13 @@
 terraform {
   required_version = ">= 1.0.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
   }
-  
+
   # Comment out the S3 backend for now to use local backend for POC
   /*
   backend "s3" {
@@ -23,7 +23,7 @@ terraform {
 provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile != "" ? var.aws_profile : null
-  
+
   default_tags {
     tags = {
       Project     = "sbxservice"
@@ -49,12 +49,12 @@ locals {
 # VPC and Network Configuration
 module "vpc" {
   source = "./modules/vpc"
-  
+
   environment        = var.environment
   vpc_cidr           = var.vpc_cidr
   availability_zones = var.availability_zones
   project_name       = var.project_name
-  
+
   public_subnet_cidrs   = var.public_subnet_cidrs
   private_subnet_cidrs  = var.private_subnet_cidrs
   firewall_subnet_cidrs = var.firewall_subnet_cidrs
@@ -63,24 +63,24 @@ module "vpc" {
 # Network Firewall
 module "network_firewall" {
   source = "./modules/network_firewall"
-  
-  project_name         = var.project_name
-  environment          = var.environment
-  vpc_id               = module.vpc.vpc_id
-  vpc_cidr             = var.vpc_cidr
-  firewall_subnet_ids  = module.vpc.firewall_subnets
-  public_subnet_cidrs  = module.vpc.public_subnet_cidrs
-  private_subnet_cidrs = module.vpc.private_subnet_cidrs
-  public_route_tables_by_az = module.vpc.public_route_tables_by_az
+
+  project_name               = var.project_name
+  environment                = var.environment
+  vpc_id                     = module.vpc.vpc_id
+  vpc_cidr                   = var.vpc_cidr
+  firewall_subnet_ids        = module.vpc.firewall_subnets
+  public_subnet_cidrs        = module.vpc.public_subnet_cidrs
+  private_subnet_cidrs       = module.vpc.private_subnet_cidrs
+  public_route_tables_by_az  = module.vpc.public_route_tables_by_az
   private_route_tables_by_az = module.vpc.private_route_tables_by_az
-  nat_gateway_id       = module.vpc.nat_gateway_id
-  availability_zones   = var.availability_zones
+  nat_gateway_id             = module.vpc.nat_gateway_id
+  availability_zones         = var.availability_zones
 }
 
 # Security Groups
 module "security_groups" {
   source = "./modules/security_groups"
-  
+
   environment = var.environment
   vpc_id      = module.vpc.vpc_id
 }
@@ -88,7 +88,7 @@ module "security_groups" {
 # App Mesh for Service Mesh
 module "app_mesh" {
   source = "./modules/app_mesh"
-  
+
   project_name   = var.project_name
   environment    = var.environment
   vpc_id         = module.vpc.vpc_id
@@ -98,7 +98,7 @@ module "app_mesh" {
 # ECS Fargate for Spring Boot Application
 module "ecs" {
   source = "./modules/ecs"
-  
+
   project_name      = var.project_name
   environment       = var.environment
   region            = var.aws_region
@@ -107,14 +107,14 @@ module "ecs" {
   private_subnets   = module.vpc.private_subnets
   public_sg_id      = module.security_groups.public_sg_id
   application_sg_id = module.security_groups.application_sg_id
-  
+
   # Container configuration
   container_image_url = lookup(local.container_images, "hello", "")
-  container_port   = 8080
-  task_cpu         = 1024
-  task_memory      = 2048
-  app_count        = 2
-  
+  container_port      = 8080
+  task_cpu            = 1024
+  task_memory         = 2048
+  app_count           = 2
+
   # App Mesh integration
   service_mesh_enabled  = true
   mesh_name             = module.app_mesh.mesh_name
@@ -125,7 +125,7 @@ module "ecs" {
 # API Gateway
 module "api_gateway" {
   source = "./modules/api_gateway"
-  
+
   project_name    = var.project_name
   environment     = var.environment
   public_subnets  = module.vpc.public_subnets
@@ -138,7 +138,7 @@ module "api_gateway" {
 resource "aws_cloudwatch_log_group" "app_logs" {
   name              = "/aws/sbxservice/${var.environment}"
   retention_in_days = 30
-  
+
   tags = {
     Name = "sbxservice-${var.environment}-logs"
   }

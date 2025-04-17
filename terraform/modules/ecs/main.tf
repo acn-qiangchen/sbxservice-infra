@@ -185,11 +185,11 @@ resource "aws_ecs_task_definition" "app" {
   memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
-  
+
   # If App Mesh is enabled, add the necessary proxy configuration
   dynamic "proxy_configuration" {
     for_each = var.service_mesh_enabled ? [1] : []
-    
+
     content {
       type           = "APPMESH"
       container_name = "envoy"
@@ -209,7 +209,7 @@ resource "aws_ecs_task_definition" "app" {
     {
       name      = "${var.project_name}-${var.environment}-container"
       image     = "${var.container_image_url}:latest"
-      cpu       = var.task_cpu - 256 # Reserve CPU for the Envoy proxy only
+      cpu       = var.task_cpu - 256    # Reserve CPU for the Envoy proxy only
       memory    = var.task_memory - 128 # Reserve memory for the Envoy proxy only
       essential = true
       portMappings = [
@@ -298,7 +298,7 @@ resource "aws_ecs_task_definition" "app" {
         startPeriod = 10
       }
     }
-  ]) : jsonencode([
+    ]) : jsonencode([
     # Simple configuration without App Mesh
     {
       name      = "${var.project_name}-${var.environment}-container"
@@ -345,7 +345,7 @@ resource "aws_lb" "main" {
   subnets            = var.public_subnets
 
   enable_deletion_protection = false
-  
+
   enable_cross_zone_load_balancing = true
 
   tags = {

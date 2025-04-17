@@ -24,7 +24,7 @@
 locals {
   firewall_endpoints_by_az = {
     for sync_state in aws_networkfirewall_firewall.main.firewall_status[0].sync_states :
-      sync_state.availability_zone => sync_state.attachment[0].endpoint_id
+    sync_state.availability_zone => sync_state.attachment[0].endpoint_id
   }
 }
 
@@ -33,9 +33,9 @@ resource "aws_route" "public_az1_to_private_az1_via_firewall_az1" {
   route_table_id         = var.public_route_tables_by_az[var.availability_zones[0]]
   destination_cidr_block = var.private_subnet_cidrs[0]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -46,9 +46,9 @@ resource "aws_route" "public_az1_to_private_az2_via_firewall_az1" {
   route_table_id         = var.public_route_tables_by_az[var.availability_zones[0]]
   destination_cidr_block = var.private_subnet_cidrs[1]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -59,9 +59,9 @@ resource "aws_route" "public_az2_to_private_az1_via_firewall_az2" {
   route_table_id         = var.public_route_tables_by_az[var.availability_zones[1]]
   destination_cidr_block = var.private_subnet_cidrs[0]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -72,9 +72,9 @@ resource "aws_route" "public_az2_to_private_az2_via_firewall_az2" {
   route_table_id         = var.public_route_tables_by_az[var.availability_zones[1]]
   destination_cidr_block = var.private_subnet_cidrs[1]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -85,9 +85,9 @@ resource "aws_route" "private_az1_to_public_az1_via_firewall_az1" {
   route_table_id         = var.private_route_tables_by_az[var.availability_zones[0]]
   destination_cidr_block = var.public_subnet_cidrs[0]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -98,9 +98,9 @@ resource "aws_route" "private_az1_to_public_az2_via_firewall_az2" {
   route_table_id         = var.private_route_tables_by_az[var.availability_zones[0]]
   destination_cidr_block = var.public_subnet_cidrs[1]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -111,9 +111,9 @@ resource "aws_route" "private_az2_to_public_az1_via_firewall_az1" {
   route_table_id         = var.private_route_tables_by_az[var.availability_zones[1]]
   destination_cidr_block = var.public_subnet_cidrs[0]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -124,9 +124,9 @@ resource "aws_route" "private_az2_to_public_az2_via_firewall_az2" {
   route_table_id         = var.private_route_tables_by_az[var.availability_zones[1]]
   destination_cidr_block = var.public_subnet_cidrs[1]
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
-  
+
   depends_on = [aws_networkfirewall_firewall.main]
-  
+
   lifecycle {
     create_before_destroy = true
   }
