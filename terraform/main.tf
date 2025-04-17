@@ -83,6 +83,7 @@ module "security_groups" {
 
   environment = var.environment
   vpc_id      = module.vpc.vpc_id
+  vpc_cidr    = var.vpc_cidr
 }
 
 # App Mesh for Service Mesh
