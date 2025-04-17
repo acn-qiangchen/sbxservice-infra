@@ -280,6 +280,10 @@ resource "aws_ecs_task_definition" "app" {
         {
           name  = "ENABLE_ENVOY_XRAY_TRACING"
           value = "1"
+        },
+        {
+          name  = "ENVOY_MAX_REQUESTS_PER_CONNECTION"
+          value = "1000"
         }
       ]
       logConfiguration = {
