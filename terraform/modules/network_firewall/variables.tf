@@ -43,6 +43,12 @@ variable "private_route_tables_by_az" {
   type        = map(string)
 }
 
+variable "firewall_route_tables_by_az" {
+  description = "Map of availability zone to firewall route table IDs"
+  type        = map(string)
+  default     = {}
+}
+
 variable "nat_gateway_id" {
   description = "ID of the primary NAT Gateway (for backwards compatibility)"
   type        = string
@@ -63,4 +69,9 @@ variable "nat_gateway_ids_by_az" {
 variable "availability_zones" {
   description = "List of availability zones to use"
   type        = list(string)
+}
+
+variable "internet_gateway_id" {
+  description = "ID of the Internet Gateway"
+  type        = string
 } 

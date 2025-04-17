@@ -56,4 +56,9 @@ output "public_route_tables_by_az" {
 output "private_route_tables_by_az" {
   description = "Map of AZ to private route table IDs"
   value       = { for az, rt in aws_route_table.private : az => rt.id }
+}
+
+output "firewall_route_tables_by_az" {
+  description = "Map of AZ to firewall route table IDs"
+  value       = { for az, rt in aws_route_table.firewall : az => rt.id }
 } 

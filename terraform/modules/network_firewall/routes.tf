@@ -130,4 +130,20 @@ resource "aws_route" "private_az2_to_public_az2_via_firewall_az2" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# Routes for Firewall Subnets
+# Add route to NAT Gateway for each firewall subnet (use NAT Gateway in same AZ)
+resource "aws_route" "firewall_to_internet" {
+  for_each = var.firewall_route_tables_by_az
+
+  route_table_id         = each.value
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = var.nat_gateway_ids_by_az[each.key]
+
+  depends_on = [aws_networkfirewall_firewall.main]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 } 
