@@ -345,6 +345,7 @@ resource "aws_lb" "main" {
   subnets            = var.public_subnets
 
   enable_deletion_protection = false
+  idle_timeout               = 25
 
   enable_cross_zone_load_balancing = true
 
