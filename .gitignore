@@ -64,4 +64,37 @@ build/
 .vscode/
 
 ### Mac OS ###
-.DS_Store 
+.DS_Store
+
+### Terraform ###
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude sensitive variables files
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+!terraform.tfvars.example
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Terraform lock files
+.terraform.lock.hcl
+
+### AWS ###
+.aws/credentials
+.aws/config 

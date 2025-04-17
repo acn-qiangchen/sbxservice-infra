@@ -1,0 +1,14 @@
+# Example terraform.tfvars file for local development
+# Copy this file to terraform.tfvars and update as needed
+
+# AWS Configuration
+aws_region  = "us-east-1"
+aws_profile = "sbxservice-poc"  # Set to your local AWS profile
+
+# Environment Settings
+environment = "dev"
+project_name = "sbxservice"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"] 
