@@ -14,7 +14,6 @@
 # - Traffic from public subnet in AZ-2 (p2) to private subnets (v1, v2) routes through firewall in AZ-2 (n2)
 # - Traffic from private subnets (v1, v2) to public subnet in AZ-1 (p1) routes through firewall in AZ-1 (n1)
 # - Traffic from private subnets (v1, v2) to public subnet in AZ-2 (p2) routes through firewall in AZ-2 (n2)
-# - Traffic from private subnets to Internet (0.0.0.0/0) routes through firewall to NAT Gateway
 # - Traffic from private subnets to VPC endpoints (ECR, etc.) bypasses the firewall
 #   (this is handled naturally by AWS VPC endpoint routing without explicit route definitions)
 
@@ -130,39 +129,5 @@ resource "aws_route" "private_az2_to_public_az2_via_firewall_az2" {
 
   lifecycle {
     create_before_destroy = true
-  }
-}
-
-# 9. Traffic from private subnet in AZ-1 (v1) to Internet (0.0.0.0/0) through firewall in AZ-1 (n1)
-resource "aws_route" "private_az1_to_internet_via_firewall_az1" {
-  route_table_id         = var.private_route_tables_by_az[var.availability_zones[0]]
-  destination_cidr_block = "0.0.0.0/0"
-  vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
-
-  depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-    replace_triggered_by = [
-      # This forces replacement when NAT Gateway changes
-      var.nat_gateway_ids_by_az[var.availability_zones[0]]
-    ]
-  }
-}
-
-# 10. Traffic from private subnet in AZ-2 (v2) to Internet (0.0.0.0/0) through firewall in AZ-2 (n2)
-resource "aws_route" "private_az2_to_internet_via_firewall_az2" {
-  route_table_id         = var.private_route_tables_by_az[var.availability_zones[1]]
-  destination_cidr_block = "0.0.0.0/0"
-  vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
-
-  depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-    replace_triggered_by = [
-      # This forces replacement when NAT Gateway changes
-      var.nat_gateway_ids_by_az[var.availability_zones[1]]
-    ]
   }
 } 
