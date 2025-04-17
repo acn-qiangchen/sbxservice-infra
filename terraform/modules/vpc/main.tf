@@ -114,20 +114,30 @@ resource "aws_route" "public_internet_gateway" {
 }
 
 # Add route to NAT Gateway for each private route table
-# Use the NAT Gateway in the same AZ for better availability and reduced cross-AZ costs
+# This will be replaced with routes to Network Firewall endpoints by the network_firewall module
 resource "aws_route" "private_nat_gateway" {
   for_each               = aws_route_table.private
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.main[index(var.availability_zones, each.key)].id
+
+  # This makes it easier to replace this route
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# Add route to Internet Gateway for each firewall route table
-resource "aws_route" "firewall_internet_gateway" {
+# Add default route from firewall subnet route table to NAT Gateway in the same AZ
+resource "aws_route" "firewall_nat_gateway" {
   for_each               = aws_route_table.firewall
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
+  nat_gateway_id         = aws_nat_gateway.main[index(var.availability_zones, each.key)].id
+
+  # In case of conflict with existing routes
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Associate public subnets with corresponding AZ route table

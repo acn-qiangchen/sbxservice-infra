@@ -130,4 +130,20 @@ resource "aws_route" "private_az2_to_public_az2_via_firewall_az2" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# Route private subnet traffic to internet (0.0.0.0/0) through Network Firewall in same AZ
+resource "aws_route" "private_to_internet_via_firewall" {
+  for_each = var.private_route_tables_by_az
+
+  route_table_id         = each.value
+  destination_cidr_block = "0.0.0.0/0"
+  vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
+
+  depends_on = [aws_networkfirewall_firewall.main]
+
+  # Replace any existing default routes
+  lifecycle {
+    create_before_destroy = true
+  }
 } 

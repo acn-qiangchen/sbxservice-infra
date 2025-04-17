@@ -11,4 +11,10 @@ variable "vpc_id" {
 variable "vpc_cidr" {
   description = "CIDR block of the VPC"
   type        = string
+}
+
+variable "firewall_subnets" {
+  description = "List of firewall subnet IDs"
+  type        = list(string)
+  default     = []
 } 
