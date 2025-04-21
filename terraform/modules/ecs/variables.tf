@@ -74,27 +74,27 @@ variable "app_count" {
   default     = 1
 }
 
-# App Mesh variables
+# App Mesh variables - kept for backward compatibility but not used anymore
 variable "service_mesh_enabled" {
-  description = "Whether to enable App Mesh integration"
+  description = "Whether to enable App Mesh integration (now defaults to false as App Mesh has been removed)"
   type        = bool
   default     = false
 }
 
 variable "mesh_name" {
-  description = "Name of the App Mesh service mesh"
+  description = "Name of the App Mesh service mesh (not used anymore)"
   type        = string
   default     = ""
 }
 
 variable "virtual_node_name" {
-  description = "Name of the App Mesh virtual node"
+  description = "Name of the App Mesh virtual node (not used anymore)"
   type        = string
   default     = ""
 }
 
 variable "service_discovery_arn" {
-  description = "ARN of the service discovery service"
+  description = "ARN of the service discovery service (not used anymore)"
   type        = string
   default     = ""
 } 

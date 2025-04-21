@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines a minimal viable architecture for the SBXService POC on AWS, focusing on deploying a simple "Hello World" Spring Boot microservice on Amazon ECS with Fargate, integrated with AWS App Mesh for service mesh capabilities and AWS Network Firewall for enhanced security.
+This document outlines a minimal viable architecture for the SBXService POC on AWS, focusing on deploying a simple "Hello World" Spring Boot microservice on Amazon ECS with Fargate and AWS Network Firewall for enhanced security.
 
 ## Architecture Diagram
 
@@ -26,17 +26,16 @@ This document outlines a minimal viable architecture for the SBXService POC on A
   │                       ▼                         │
   │  ECS Cluster (Fargate)                          │
   │  ┌───────────────────────────────────────┐      │
-  │  │                AWS App Mesh           │      │
+  │  │                                       │      │
   │  │  ┌─────────────────────────────────┐  │      │
-  │  │  │ ┌─────────┐     ┌─────────────┐ │  │      │
-  │  │  │ │ Envoy   │     │ Spring Boot │ │  │      │
-  │  │  │ │ Proxy   ├────►│ Service     │ │  │      │
-  │  │  │ └─────────┘     └─────────────┘ │  │      │
   │  │  │                                 │  │      │
-  │  │  │ ┌─────────┐                     │  │      │
-  │  │  │ │ X-Ray   │                     │  │      │
-  │  │  │ │ Daemon  │                     │  │      │
-  │  │  │ └─────────┘                     │  │      │
+  │  │  │                                 │  │      │
+  │  │  │                                 │  │      │
+  │  │  │ ┌─────────────┐                │  │      │
+  │  │  │ │ Spring Boot │                │  │      │
+  │  │  │ │ Service     │                │  │      │
+  │  │  │ └─────────────┘                │  │      │
+  │  │  │                                 │  │      │
   │  │  └─────────────────────────────────┘  │      │
   │  └───────────────────────────────────────┘      │
   │                                                 │
@@ -62,13 +61,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Accessible via API Gateway and ALB
    - Default Fargate configuration (1 vCPU, 2GB memory)
 
-2. **AWS App Mesh**
-   - Service mesh architecture for fine-grained control over service-to-service communication
-   - Envoy proxy sidecar container for traffic management
-   - Service discovery via AWS Cloud Map
-   - X-Ray integration for distributed tracing
-
-3. **AWS Network Firewall**
+2. **AWS Network Firewall**
    - Network-level protection between public and private resources
    - Stateful inspection of traffic with Suricata-compatible rules
    - Custom Suricata rules for HTTP protocol enforcement and attack prevention
@@ -76,7 +69,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Dedicated firewall subnet for Network Firewall endpoints
    - Advanced security inspection for north-south traffic
 
-4. **VPC Endpoints**
+3. **VPC Endpoints**
    - Private connectivity to AWS services without traversing the public internet
    - ECR API and ECR Docker Registry endpoints for container image pulls
    - S3 Gateway endpoint for ECR layer storage access
@@ -84,7 +77,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Enhanced security by keeping traffic within AWS network
    - Enables ECS tasks in private subnets to access AWS services through Network Firewall
 
-5. **Networking & Security**
+4. **Networking & Security**
    - VPC with public, private, and firewall subnets
    - Security groups for network traffic control
    - IAM roles for service permissions
@@ -199,12 +192,6 @@ terraform apply -var="container_image_hello=123456789012.dkr.ecr.us-east-1.amazo
 
 For backward compatibility, the `container_image_url` variable is still supported but deprecated.
 
-This service-specific suffix naming approach enables:
-- Clear identification of which container image is for which service
-- Easy extension for additional services in the future by adding new variables with appropriate suffixes
-- Support for task definitions with multiple containers when needed
-- Cleaner separation of concerns between infrastructure and application code
-
 ## Monitoring
 
    - Basic CloudWatch metrics for service monitoring
@@ -229,9 +216,7 @@ This service-specific suffix naming approach enables:
 
 2. **AWS Infrastructure Setup**
    - Set up ECS cluster with Fargate launch type
-   - Configure App Mesh service mesh
    - Deploy Network Firewall with security rules
-   - Configure task definition with Envoy sidecar
    - Set up API Gateway with REST API type
    - Create VPC endpoints for ECR, S3, and CloudWatch Logs services to enable private connectivity
 
@@ -280,28 +265,10 @@ This service-specific suffix naming approach enables:
    - Simpler network architecture with fewer components to manage
    - Per-hour pricing for interface endpoints with minimal data processing charges
 
-## App Mesh Benefits
-
-1. **Traffic Management**
-   - Canary deployments and blue/green deployments
-   - Circuit breaking and retry policies
-   - Load balancing and traffic shaping
-
-2. **Observability**
-   - End-to-end visibility of service mesh traffic
-   - Metrics, logs, and traces in one place
-   - Integrated with AWS X-Ray for distributed tracing
-
-3. **Security**
-   - TLS encryption for service-to-service communication
-   - Identity-based policies for services
-   - Integration with AWS security services
-
 ## Infrastructure Considerations
 
 1. **Cost Optimization**
    - Standard Fargate pricing will apply
-   - Additional costs for App Mesh (per hour per mesh endpoint)
    - Network Firewall costs based on number of firewall endpoints
    - X-Ray has minimal costs for POC workloads
    - API Gateway will use pay-per-use pricing model
@@ -315,11 +282,10 @@ This service-specific suffix naming approach enables:
 ## Next Steps After POC
 
 1. **Evaluation Criteria**
-   - Successful deployment of Spring Boot application to ECS Fargate with App Mesh
+   - Successful deployment of Spring Boot application to ECS Fargate
    - Network Firewall properly securing traffic between public and private resources
    - Accessible API endpoints via API Gateway
    - Functional CI/CD pipeline
-   - Traffic management via App Mesh
 
 2. **Potential Enhancements for Production**
    - Custom domain name with SSL/TLS
@@ -327,7 +293,6 @@ This service-specific suffix naming approach enables:
    - Authentication and authorization
    - Data persistence layer
    - Auto-scaling based on traffic patterns
-   - Multi-service App Mesh implementation
    - Advanced Network Firewall rule sets
 
 This architecture provides a solid foundation for demonstrating the core functionality of a service mesh and network security while keeping complexity and costs to a minimum. It can be expanded upon based on the POC results and feedback. 

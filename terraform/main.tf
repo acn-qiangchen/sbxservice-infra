@@ -91,16 +91,6 @@ module "security_groups" {
   firewall_subnets = module.vpc.firewall_subnets
 }
 
-# App Mesh for Service Mesh
-module "app_mesh" {
-  source = "./modules/app_mesh"
-
-  project_name   = var.project_name
-  environment    = var.environment
-  vpc_id         = module.vpc.vpc_id
-  container_port = 8080
-}
-
 # ECS Fargate for Spring Boot Application
 module "ecs" {
   source = "./modules/ecs"
@@ -121,11 +111,8 @@ module "ecs" {
   task_memory         = 2048
   app_count           = 2
 
-  # App Mesh integration
-  service_mesh_enabled  = true
-  mesh_name             = module.app_mesh.mesh_name
-  virtual_node_name     = module.app_mesh.virtual_node_name
-  service_discovery_arn = module.app_mesh.service_discovery_service_arn
+  # Set App Mesh integration to false
+  service_mesh_enabled = false
 }
 
 # API Gateway
@@ -159,11 +146,6 @@ output "api_gateway_endpoint" {
 output "alb_dns_name" {
   description = "The DNS name of the load balancer"
   value       = module.ecs.alb_dns_name
-}
-
-output "mesh_name" {
-  description = "The name of the App Mesh service mesh"
-  value       = module.app_mesh.mesh_name
 }
 
 output "network_firewall_status" {
