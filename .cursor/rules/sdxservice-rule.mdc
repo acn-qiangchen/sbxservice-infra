@@ -14,4 +14,5 @@ alwaysApply: true
 - when architecture is changed. alwasy remember to update architecture blueprint documents under docs/architecture directory.
 - when build docker image, alwasy keep in mind set the `platform` flag to proper value.
 - when generate git commit message, use japanese
+- run terraform fmt and terraform valicate after code change,  to make sure code is clean all the time.
 

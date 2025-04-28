@@ -143,7 +143,7 @@ module "api_gateway" {
 # Portal (S3 + CloudFront)
 module "portal" {
   source = "./modules/portal"
-  
+
   project_name    = var.project_name
   environment     = var.environment
   api_gateway_url = module.api_gateway.api_endpoint
