@@ -60,9 +60,10 @@ resource "aws_s3_bucket_policy" "portal" {
 
 # Process HTML file to replace API Gateway URL
 locals {
-  html_content = templatefile("${path.module}/../../portal/index.html",
-    { API_GATEWAY_URL = var.api_gateway_url }
-  )
+  # Use the file function to read the HTML content, then replace the API_GATEWAY_URL placeholder
+  html_path    = "${path.root}/../portal/index.html"
+  html_raw     = file(local.html_path)
+  html_content = replace(local.html_raw, "$${API_GATEWAY_URL}", var.api_gateway_url)
 }
 
 # Upload index.html to S3
