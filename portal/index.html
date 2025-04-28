@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
             text-align: center;
@@ -31,12 +31,38 @@
             margin: 10px 2px;
             cursor: pointer;
             border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
         }
         #response {
             margin-top: 20px;
             padding: 10px;
             border-radius: 4px;
             min-height: 50px;
+            text-align: left;
+            white-space: pre-wrap;
+            font-family: monospace;
+            background-color: #f0f0f0;
+            overflow-x: auto;
+        }
+        .response-section {
+            margin-bottom: 15px;
+        }
+        .key {
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .value {
+            color: #333;
+        }
+        .section-title {
+            margin-top: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            color: #333;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -57,7 +83,7 @@
             
             try {
                 // The API_GATEWAY_URL value will be inserted during Terraform deployment
-                const API_ENDPOINT = "${API_GATEWAY_URL}";
+                const API_ENDPOINT = "${API_GATEWAY_URL}/api/hello";
                 
                 const response = await fetch(API_ENDPOINT, {
                     method: 'GET',
@@ -71,7 +97,32 @@
                 }
                 
                 const data = await response.json();
-                responseElement.innerHTML = `<strong>Response:</strong> ${JSON.stringify(data, null, 2)}`;
+                
+                // Format the JSON response in a more readable way
+                let formattedResponse = '<div class="response-section">';
+                
+                // Main message and timestamp
+                formattedResponse += `<div><span class="key">Message:</span> <span class="value">${data.message}</span></div>`;
+                formattedResponse += `<div><span class="key">Timestamp:</span> <span class="value">${data.timestamp}</span></div>`;
+                formattedResponse += `<div><span class="key">User Agent:</span> <span class="value">${data.userAgent}</span></div>`;
+                
+                // Server info section
+                formattedResponse += '<div class="section-title">Server Information</div>';
+                for (const [key, value] of Object.entries(data.serverInfo || {})) {
+                    formattedResponse += `<div><span class="key">${key}:</span> <span class="value">${value}</span></div>`;
+                }
+                
+                // Request headers section (collapsible to save space)
+                formattedResponse += '<div class="section-title">Request Headers</div>';
+                formattedResponse += '<div style="max-height: 200px; overflow-y: auto;">';
+                for (const [key, value] of Object.entries(data.requestHeaders || {})) {
+                    formattedResponse += `<div><span class="key">${key}:</span> <span class="value">${value}</span></div>`;
+                }
+                formattedResponse += '</div>';
+                
+                formattedResponse += '</div>';
+                
+                responseElement.innerHTML = formattedResponse;
             } catch (error) {
                 responseElement.innerHTML = `<strong>Error:</strong> ${error.message}`;
                 console.error('Error calling API:', error);
