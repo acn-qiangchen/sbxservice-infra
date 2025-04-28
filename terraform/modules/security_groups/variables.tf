@@ -6,4 +6,15 @@ variable "environment" {
 variable "vpc_id" {
   description = "ID of the VPC"
   type        = string
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block of the VPC"
+  type        = string
+}
+
+variable "firewall_subnets" {
+  description = "List of firewall subnet IDs"
+  type        = list(string)
+  default     = []
 } 

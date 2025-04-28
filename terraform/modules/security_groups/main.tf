@@ -52,11 +52,20 @@ resource "aws_security_group" "application" {
 
   # Allow internal traffic within this security group
   ingress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    self            = true
-    description     = "Allow internal traffic within this security group"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+    description = "Allow internal traffic within this security group"
+  }
+
+  # Allow all traffic from within the VPC
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+    description = "Allow all traffic from within the VPC"
   }
 
   egress {

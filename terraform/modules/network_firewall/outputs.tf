@@ -31,4 +31,9 @@ output "flow_log_group" {
 output "alert_log_group" {
   description = "CloudWatch Log Group for Network Firewall alert logs"
   value       = aws_cloudwatch_log_group.network_firewall_alert.name
+}
+
+output "firewall_endpoints_by_az" {
+  description = "Map of AZ to Network Firewall endpoint IDs"
+  value       = local.firewall_endpoints_by_az
 } 

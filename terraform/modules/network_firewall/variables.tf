@@ -48,6 +48,30 @@ variable "nat_gateway_id" {
   type        = string
 }
 
+variable "nat_gateway_ids" {
+  description = "List of all NAT Gateway IDs"
+  type        = list(string)
+  default     = []
+}
+
+variable "nat_gateway_ids_by_az" {
+  description = "Map of AZ to NAT Gateway IDs"
+  type        = map(string)
+  default     = {}
+}
+
+variable "internet_gateway_id" {
+  description = "ID of the Internet Gateway"
+  type        = string
+  default     = ""
+}
+
+variable "firewall_route_tables_by_az" {
+  description = "Map of availability zone to firewall route table IDs"
+  type        = map(string)
+  default     = {}
+}
+
 variable "availability_zones" {
   description = "List of availability zones to use"
   type        = list(string)

@@ -54,22 +54,24 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Elastic IP for NAT Gateway
+# Elastic IP for NAT Gateways
 resource "aws_eip" "nat" {
+  count  = length(var.availability_zones)
   domain = "vpc"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nat-eip"
+    Name = "${var.project_name}-${var.environment}-nat-eip-${count.index + 1}"
   }
 }
 
-# NAT Gateway
+# NAT Gateways (one per AZ)
 resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
+  count         = length(var.availability_zones)
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nat"
+    Name = "${var.project_name}-${var.environment}-nat-${count.index + 1}"
   }
 }
 
@@ -93,6 +95,16 @@ resource "aws_route_table" "private" {
   }
 }
 
+# Create firewall route tables per AZ
+resource "aws_route_table" "firewall" {
+  for_each = { for i, az in var.availability_zones : az => i }
+  vpc_id   = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-firewall-rt-${each.key}"
+  }
+}
+
 # Add route to Internet Gateway for each public route table
 resource "aws_route" "public_internet_gateway" {
   for_each               = aws_route_table.public
@@ -101,12 +113,20 @@ resource "aws_route" "public_internet_gateway" {
   gateway_id             = aws_internet_gateway.main.id
 }
 
-# Add route to NAT Gateway for each private route table
-resource "aws_route" "private_nat_gateway" {
-  for_each               = aws_route_table.private
+# Private subnet default routes will be created by the network_firewall module
+# to route traffic through the Network Firewall endpoints in the same AZ
+
+# Add default route from firewall subnet route table to NAT Gateway in the same AZ
+resource "aws_route" "firewall_nat_gateway" {
+  for_each               = aws_route_table.firewall
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.main.id
+  nat_gateway_id         = aws_nat_gateway.main[index(var.availability_zones, each.key)].id
+
+  # In case of conflict with existing routes
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Associate public subnets with corresponding AZ route table
@@ -121,6 +141,13 @@ resource "aws_route_table_association" "private" {
   count          = length(var.private_subnet_cidrs)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[var.availability_zones[count.index % length(var.availability_zones)]].id
+}
+
+# Associate firewall subnets with corresponding AZ route table
+resource "aws_route_table_association" "firewall" {
+  count          = length(var.firewall_subnet_cidrs)
+  subnet_id      = aws_subnet.firewall[count.index].id
+  route_table_id = aws_route_table.firewall[var.availability_zones[count.index % length(var.availability_zones)]].id
 }
 
 # VPC endpoints for ECR
