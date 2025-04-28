@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBXService Portal</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to SBXService Portal</h1>
+    
+    <div class="container">
+        <h2>Hello Service API Demo</h2>
+        <p>Click the button below to call the hello service API:</p>
+        <button id="callApi">Call Hello API</button>
+        <div id="response">Results will appear here...</div>
+    </div>
+
+    <script>
+        document.getElementById('callApi').addEventListener('click', async () => {
+            const responseElement = document.getElementById('response');
+            responseElement.innerHTML = 'Calling API...';
+            
+            try {
+                // The API_GATEWAY_URL value will be inserted during Terraform deployment
+                const API_ENDPOINT = "${API_GATEWAY_URL}";
+                
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                responseElement.innerHTML = `<strong>Response:</strong> ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                responseElement.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                console.error('Error calling API:', error);
+            }
+        });
+    </script>
+</body>
+</html> 

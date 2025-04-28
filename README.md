@@ -12,6 +12,7 @@ This infrastructure implements a minimal architecture with the following compone
 - AWS App Mesh for service mesh capabilities
 - AWS Network Firewall for security
 - Amazon CloudWatch for monitoring
+- Amazon S3 and CloudFront for static web portal hosting
 
 For architecture details, see [POC Architecture](docs/poc_architecture.md).
 
@@ -117,6 +118,7 @@ The architecture is designed to be extended in the future to support multiple se
 After successful application, Terraform will output:
 - ALB hostname
 - API Gateway endpoint URL
+- CloudFront portal URL
 - Container images being used
 
 ## Network Firewall Architecture
@@ -173,6 +175,17 @@ aws ecs execute-command --cluster sbxservice-dev-cluster \
                        --interactive \
                        --command "/bin/sh"
 ```
+
+## Accessing the Portal
+
+After deployment, you can access the portal using the CloudFront URL provided in the Terraform outputs:
+
+```bash
+# Get the portal URL
+terraform -chdir=terraform output portal_url
+```
+
+The portal provides a simple interface to interact with the Hello Service API.
 
 ## Common Issues and Troubleshooting
 

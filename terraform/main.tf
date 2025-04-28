@@ -134,6 +134,15 @@ module "api_gateway" {
   alb_dns_name    = module.ecs.alb_dns_name
 }
 
+# Portal (S3 + CloudFront)
+module "portal" {
+  source = "./modules/portal"
+  
+  project_name    = var.project_name
+  environment     = var.environment
+  api_gateway_url = module.api_gateway.api_endpoint
+}
+
 # CloudWatch Log Groups
 resource "aws_cloudwatch_log_group" "app_logs" {
   name              = "/aws/sbxservice/${var.environment}"
@@ -184,4 +193,20 @@ output "network_firewall_alert_logs" {
 output "container_images" {
   description = "Map of container images being used for each service"
   value       = local.container_images
+}
+
+# Portal outputs
+output "portal_bucket_name" {
+  description = "Name of the S3 bucket hosting the portal content"
+  value       = module.portal.portal_bucket_name
+}
+
+output "portal_cloudfront_domain" {
+  description = "CloudFront domain for the portal"
+  value       = module.portal.cloudfront_domain_name
+}
+
+output "portal_url" {
+  description = "URL to access the portal"
+  value       = "https://${module.portal.cloudfront_domain_name}"
 } 

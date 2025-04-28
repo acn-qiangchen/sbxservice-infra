@@ -8,6 +8,17 @@ This document outlines a minimal viable architecture for the SBXService POC on A
 
 ```
                    ┌───────────────┐
+                   │  CloudFront   │
+                   └───────┬───────┘
+                           │
+                           ▼
+                   ┌───────────────┐
+                   │   S3 Bucket   │
+                   │   (Portal)    │
+                   └───────┬───────┘
+                           │
+                           ▼
+                   ┌───────────────┐
                    │  API Gateway  │
                    └───────┬───────┘
                            │
@@ -56,19 +67,26 @@ This document outlines a minimal viable architecture for the SBXService POC on A
 
 ## Core Components
 
-1. **Spring Boot Service**
+1. **Web Portal**
+   - Simple HTML/CSS/JavaScript static website hosted on S3
+   - Secure private S3 bucket (not publicly accessible)
+   - Distributed via CloudFront for global availability
+   - Connects to the Hello Service API through API Gateway
+   - Provides a user-friendly interface for testing the service
+
+2. **Spring Boot Service**
    - Simple containerized Spring Boot application providing a "Hello World" REST API
    - Deployed to ECS Fargate (serverless containers)
    - Accessible via API Gateway and ALB
    - Default Fargate configuration (1 vCPU, 2GB memory)
 
-2. **AWS App Mesh**
+3. **AWS App Mesh**
    - Service mesh architecture for fine-grained control over service-to-service communication
    - Envoy proxy sidecar container for traffic management
    - Service discovery via AWS Cloud Map
    - X-Ray integration for distributed tracing
 
-3. **AWS Network Firewall**
+4. **AWS Network Firewall**
    - Network-level protection between public and private resources
    - Stateful inspection of traffic with Suricata-compatible rules
    - Custom Suricata rules for HTTP protocol enforcement and attack prevention
@@ -76,7 +94,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Dedicated firewall subnet for Network Firewall endpoints
    - Advanced security inspection for north-south traffic
 
-4. **VPC Endpoints**
+5. **VPC Endpoints**
    - Private connectivity to AWS services without traversing the public internet
    - ECR API and ECR Docker Registry endpoints for container image pulls
    - S3 Gateway endpoint for ECR layer storage access
@@ -84,7 +102,7 @@ This document outlines a minimal viable architecture for the SBXService POC on A
    - Enhanced security by keeping traffic within AWS network
    - Enables ECS tasks in private subnets to access AWS services through Network Firewall
 
-5. **Networking & Security**
+6. **Networking & Security**
    - VPC with public, private, and firewall subnets
    - Security groups for network traffic control
    - IAM roles for service permissions
@@ -218,16 +236,28 @@ This service-specific suffix naming approach enables:
   │  GitHub   │────►│   Build   │────►│ Push to ECR    │────►│ Deploy to   │
   │  Repo     │     │   Image   │     │ Container Repo │     │ ECS Fargate │
   └───────────┘     └───────────┘     └────────────────┘     └─────────────┘
+                                                                   │
+                                                                   ▼
+                                                            ┌─────────────┐
+                                                            │Update Portal│
+                                                            │     S3      │
+                                                            └─────────────┘
 ```
 
 ## Implementation Steps
 
-1. **Spring Boot Application**
+1. **Web Portal**
+   - Create a simple HTML/CSS/JavaScript static website
+   - Set up a private S3 bucket for hosting
+   - Configure CloudFront distribution for content delivery
+   - Set up API Gateway integration for backend communication
+
+2. **Spring Boot Application**
    - Create a simple Spring Boot application with a REST controller
    - Implement a basic health check endpoint
    - Containerize using Docker (create Dockerfile)
 
-2. **AWS Infrastructure Setup**
+3. **AWS Infrastructure Setup**
    - Set up ECS cluster with Fargate launch type
    - Configure App Mesh service mesh
    - Deploy Network Firewall with security rules
@@ -235,7 +265,7 @@ This service-specific suffix naming approach enables:
    - Set up API Gateway with REST API type
    - Create VPC endpoints for ECR, S3, and CloudWatch Logs services to enable private connectivity
 
-3. **CI/CD Pipeline**
+4. **CI/CD Pipeline**
    - Configure CI/CD workflows for:
      - Building the Spring Boot application
      - Creating and pushing Docker image to ECR
