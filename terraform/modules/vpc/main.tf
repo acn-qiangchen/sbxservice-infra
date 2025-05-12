@@ -106,14 +106,6 @@ resource "aws_route_table" "firewall" {
   }
 }
 
-# Add route to Internet Gateway for each public route table
-resource "aws_route" "public_internet_gateway" {
-  for_each               = aws_route_table.public
-  route_table_id         = each.value.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
-}
-
 # Private subnet default routes will be created by the network_firewall module
 # to route traffic through the Network Firewall endpoints in the same AZ
 

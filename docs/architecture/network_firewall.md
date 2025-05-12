@@ -23,8 +23,32 @@ Traffic Flow:
 1. Internet -> Internet Gateway
 2. Internet Gateway -> Network Firewall (in public subnet)
 3. Network Firewall -> ALB (in public subnet)
-4. ALB -> ECS Tasks (in private subnet)
+4. ALB -> Network Firewall -> ECS Tasks (in private subnet)
+5. ECS Tasks -> Network Firewall -> ALB (for return traffic)
+6. ALB -> Network Firewall -> Internet Gateway -> Internet (for return traffic)
 ```
+
+## Routing Tables Configuration
+
+### Edge Route Table (Internet Gateway)
+- Routes traffic to public subnets through Network Firewall endpoints
+- Default route for VPC CIDR through Network Firewall
+
+### Public Subnet Route Tables
+- Routes to private subnets go through Network Firewall
+- Default route (0.0.0.0/0) goes through Network Firewall
+
+### Firewall Subnet Route Tables
+- Default route (0.0.0.0/0) goes directly to Internet Gateway
+
+### Private Subnet Route Tables
+- Routes to public subnets go through Network Firewall
+- Default route (0.0.0.0/0) goes through Network Firewall
+
+This configuration ensures:
+1. All incoming traffic is inspected by the Network Firewall before reaching ALB
+2. All traffic between ALB and ECS tasks is inspected by the Network Firewall
+3. All outgoing traffic is inspected by the Network Firewall before leaving the VPC
 
 ## Previous Architecture (Network Firewall in Private Subnets)
 

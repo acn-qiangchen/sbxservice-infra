@@ -182,4 +182,32 @@ resource "aws_route" "igw_to_public_via_firewall" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# Add a default route for all other traffic to the VPC
+resource "aws_route" "igw_default_route" {
+  route_table_id         = aws_route_table.igw_edge.id
+  destination_cidr_block = var.vpc_cidr
+  vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
+
+  depends_on = [aws_networkfirewall_firewall.main]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Add default routes for public subnets to reach the internet via firewall
+resource "aws_route" "public_to_internet_via_firewall" {
+  for_each = var.public_route_tables_by_az
+
+  route_table_id         = each.value
+  destination_cidr_block = "0.0.0.0/0"
+  vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
+
+  depends_on = [aws_networkfirewall_firewall.main]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 } 
