@@ -68,9 +68,9 @@ variable "private_subnet_cidrs" {
 }
 
 variable "firewall_subnet_cidrs" {
-  description = "List of CIDR blocks for firewall subnets"
+  description = "List of CIDR blocks for firewall subnets (public subnets for firewall endpoints)"
   type        = list(string)
-  default     = ["10.0.20.0/24", "10.0.21.0/24"]
+  default     = ["10.0.2.0/24", "10.0.3.0/24"]
 }
 
 # Database variables are commented out since we're not using a database in our POC

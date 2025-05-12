@@ -146,4 +146,40 @@ resource "aws_route" "private_to_internet_via_firewall" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# New routing pattern for Internet Gateway -> ALB through Network Firewall
+# Create an edge route table for Internet Gateway
+resource "aws_route_table" "igw_edge" {
+  vpc_id = var.vpc_id
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-igw-edge-rt"
+  }
+}
+
+# Associate the edge route table with the Internet Gateway
+resource "aws_route_table_association" "igw_edge" {
+  gateway_id     = var.internet_gateway_id
+  route_table_id = aws_route_table.igw_edge.id
+}
+
+# Route traffic from Internet Gateway to public subnets through Network Firewall
+resource "aws_route" "igw_to_public_via_firewall" {
+  for_each = {
+    for i, az in var.availability_zones : az => {
+      public_cidr = var.public_subnet_cidrs[i]
+      endpoint_id = local.firewall_endpoints_by_az[az]
+    }
+  }
+
+  route_table_id         = aws_route_table.igw_edge.id
+  destination_cidr_block = each.value.public_cidr
+  vpc_endpoint_id        = each.value.endpoint_id
+
+  depends_on = [aws_networkfirewall_firewall.main]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 } 

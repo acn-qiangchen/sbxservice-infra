@@ -19,7 +19,7 @@ variable "vpc_cidr" {
 }
 
 variable "firewall_subnet_ids" {
-  description = "List of subnet IDs for Network Firewall deployment"
+  description = "List of public subnet IDs for deploying Network Firewall endpoints"
   type        = list(string)
 }
 
