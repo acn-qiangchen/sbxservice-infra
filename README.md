@@ -133,6 +133,18 @@ The deployment includes AWS Network Firewall for enhanced security:
 
 The Network Firewall is positioned at the edge of the VPC to inspect all incoming traffic before it reaches the ALB, providing an additional layer of protection for your application.
 
+### Handling Route Conflicts
+
+When deploying the Network Firewall with edge routing, you might encounter route conflicts with AWS default local routes. If you see errors like `RouteAlreadyExists`, you may need to manually delete conflicting routes before applying Terraform:
+
+```bash
+# List route tables to find the route table ID
+aws ec2 describe-route-tables --filters "Name=tag:Name,Values=*igw-edge*" --query "RouteTables[*].{ID:RouteTableId, Name:Tags[?Key=='Name'].Value|[0]}"
+
+# Delete the conflicting route
+aws ec2 delete-route --route-table-id <rtb-id> --destination-cidr-block <vpc-cidr>
+```
+
 ## Building and Deploying Applications
 
 **Important:** The ECR resources have been moved to a separate repository. When building and deploying applications, ensure you:

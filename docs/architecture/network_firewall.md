@@ -32,7 +32,8 @@ Traffic Flow:
 
 ### Edge Route Table (Internet Gateway)
 - Routes traffic to public subnets through Network Firewall endpoints
-- Default route for VPC CIDR through Network Firewall
+- Routes traffic to private subnets through Network Firewall endpoints
+- Uses specific subnet routes rather than VPC-wide routes to avoid conflicts with AWS default local routes
 
 ### Public Subnet Route Tables
 - Routes to private subnets go through Network Firewall

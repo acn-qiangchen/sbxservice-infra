@@ -35,10 +35,6 @@ resource "aws_route" "public_az1_to_private_az1_via_firewall_az1" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 2. Traffic from public subnet in AZ-1 (p1) to private subnet in AZ-2 (v2) through firewall in AZ-1 (n1)
@@ -48,10 +44,6 @@ resource "aws_route" "public_az1_to_private_az2_via_firewall_az1" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 3. Traffic from public subnet in AZ-2 (p2) to private subnet in AZ-1 (v1) through firewall in AZ-2 (n2)
@@ -61,10 +53,6 @@ resource "aws_route" "public_az2_to_private_az1_via_firewall_az2" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 4. Traffic from public subnet in AZ-2 (p2) to private subnet in AZ-2 (v2) through firewall in AZ-2 (n2)
@@ -74,10 +62,6 @@ resource "aws_route" "public_az2_to_private_az2_via_firewall_az2" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 5. Traffic from private subnet in AZ-1 (v1) to public subnet in AZ-1 (p1) through firewall in AZ-1 (n1)
@@ -87,10 +71,6 @@ resource "aws_route" "private_az1_to_public_az1_via_firewall_az1" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 6. Traffic from private subnet in AZ-1 (v1) to public subnet in AZ-2 (p2) through firewall in AZ-2 (n2)
@@ -100,10 +80,6 @@ resource "aws_route" "private_az1_to_public_az2_via_firewall_az2" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 7. Traffic from private subnet in AZ-2 (v2) to public subnet in AZ-1 (p1) through firewall in AZ-1 (n1)
@@ -113,10 +89,6 @@ resource "aws_route" "private_az2_to_public_az1_via_firewall_az1" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # 8. Traffic from private subnet in AZ-2 (v2) to public subnet in AZ-2 (p2) through firewall in AZ-2 (n2)
@@ -126,10 +98,6 @@ resource "aws_route" "private_az2_to_public_az2_via_firewall_az2" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[1]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # Route private subnet traffic to internet (0.0.0.0/0) through Network Firewall in same AZ
@@ -141,11 +109,6 @@ resource "aws_route" "private_to_internet_via_firewall" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  # Replace any existing default routes
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # New routing pattern for Internet Gateway -> ALB through Network Firewall
@@ -178,23 +141,18 @@ resource "aws_route" "igw_to_public_via_firewall" {
   vpc_endpoint_id        = each.value.endpoint_id
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
-# Add a default route for all other traffic to the VPC
-resource "aws_route" "igw_default_route" {
+# Instead of routing the entire VPC CIDR, create specific routes for private subnets
+# This avoids conflicts with the default local route that AWS creates automatically
+resource "aws_route" "igw_to_private_via_firewall" {
+  count = length(var.private_subnet_cidrs)
+
   route_table_id         = aws_route_table.igw_edge.id
-  destination_cidr_block = var.vpc_cidr
-  vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[0]]
+  destination_cidr_block = var.private_subnet_cidrs[count.index]
+  vpc_endpoint_id        = local.firewall_endpoints_by_az[var.availability_zones[count.index % length(var.availability_zones)]]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # Add default routes for public subnets to reach the internet via firewall
@@ -206,8 +164,4 @@ resource "aws_route" "public_to_internet_via_firewall" {
   vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
 
   depends_on = [aws_networkfirewall_firewall.main]
-
-  lifecycle {
-    create_before_destroy = true
-  }
 } 
