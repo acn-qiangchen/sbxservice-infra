@@ -380,11 +380,43 @@ resource "aws_lb_target_group" "app" {
   }
 }
 
-# ALB Listener
-resource "aws_lb_listener" "front_end" {
+# ALB Listener for HTTP
+resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
+
+  default_action {
+    type = var.enable_https && var.redirect_http_to_https ? "redirect" : "forward"
+
+    dynamic "redirect" {
+      for_each = var.enable_https && var.redirect_http_to_https ? [1] : []
+      content {
+        port        = var.https_port
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+
+    dynamic "forward" {
+      for_each = (!var.enable_https || !var.redirect_http_to_https) ? [1] : []
+      content {
+        target_group {
+          arn = aws_lb_target_group.app.arn
+        }
+      }
+    }
+  }
+}
+
+# ALB Listener for HTTPS
+resource "aws_lb_listener" "https" {
+  count             = var.enable_https && var.ssl_certificate_arn != "" ? 1 : 0
+  load_balancer_arn = aws_lb.main.arn
+  port              = var.https_port
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
+  certificate_arn   = var.ssl_certificate_arn
 
   default_action {
     type             = "forward"
@@ -425,7 +457,8 @@ resource "aws_ecs_service" "app" {
   }
 
   depends_on = [
-    aws_lb_listener.front_end
+    aws_lb_listener.http,
+    aws_lb_listener.https
   ]
 
   tags = {

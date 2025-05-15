@@ -97,4 +97,29 @@ variable "service_discovery_arn" {
   description = "ARN of the service discovery service"
   type        = string
   default     = ""
+}
+
+# HTTPS variables
+variable "enable_https" {
+  description = "Whether to enable HTTPS for the ALB"
+  type        = bool
+  default     = true
+}
+
+variable "ssl_certificate_arn" {
+  description = "ARN of the SSL certificate for HTTPS termination"
+  type        = string
+  default     = ""
+}
+
+variable "https_port" {
+  description = "Port for HTTPS traffic"
+  type        = number
+  default     = 443
+}
+
+variable "redirect_http_to_https" {
+  description = "Whether to redirect HTTP traffic to HTTPS"
+  type        = bool
+  default     = true
 } 

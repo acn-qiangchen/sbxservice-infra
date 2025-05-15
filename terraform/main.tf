@@ -121,6 +121,12 @@ module "ecs" {
   task_memory         = 2048
   app_count           = 2
 
+  # HTTPS configuration
+  enable_https        = var.enable_https
+  ssl_certificate_arn = var.ssl_certificate_arn
+  https_port          = var.https_port
+  redirect_http_to_https = var.redirect_http_to_https
+
   # App Mesh integration
   service_mesh_enabled  = true
   mesh_name             = module.app_mesh.mesh_name

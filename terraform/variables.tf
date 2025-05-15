@@ -73,6 +73,31 @@ variable "firewall_subnet_cidrs" {
   default     = ["10.0.2.0/24", "10.0.3.0/24"]
 }
 
+# HTTPS variables
+variable "enable_https" {
+  description = "Whether to enable HTTPS for the ALB"
+  type        = bool
+  default     = true
+}
+
+variable "ssl_certificate_arn" {
+  description = "ARN of the SSL certificate for HTTPS termination"
+  type        = string
+  default     = ""
+}
+
+variable "https_port" {
+  description = "Port for HTTPS traffic"
+  type        = number
+  default     = 443
+}
+
+variable "redirect_http_to_https" {
+  description = "Whether to redirect HTTP traffic to HTTPS"
+  type        = bool
+  default     = true
+}
+
 # Database variables are commented out since we're not using a database in our POC
 /*
 variable "db_name" {

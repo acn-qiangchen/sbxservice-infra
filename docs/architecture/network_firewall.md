@@ -143,8 +143,8 @@ graph TB
 
 ### Traffic Flow Examples
 
-1. **Inbound Traffic to Public Subnet in AZ-A**:
-   Internet → Internet Gateway → IGW Route Table → Firewall Endpoint in AZ-A → ALB in AZ-A
+1. **Inbound HTTPS Traffic to Public Subnet in AZ-A**:
+   Internet → Internet Gateway → IGW Route Table → Firewall Endpoint in AZ-A → ALB in AZ-A (HTTPS termination) → HTTP to ECS Tasks
 
 2. **Outbound Traffic from Public Subnet in AZ-A**:
    ALB in AZ-A → Public Subnet Route Table → Firewall Endpoint in AZ-A → Internet Gateway → Internet
@@ -154,6 +154,27 @@ graph TB
 
 4. **Cross-AZ Traffic from AZ-A to AZ-B**:
    This traffic follows AWS's default VPC routing and doesn't need special routes.
+
+### SSL/TLS Termination at the ALB
+
+The architecture is configured to handle HTTPS traffic as follows:
+
+1. **HTTPS Termination**: 
+   - HTTPS connections from clients terminate at the Application Load Balancer (ALB)
+   - The ALB handles the SSL/TLS processing, decrypting the traffic
+   - This reduces the processing load on the application servers
+
+2. **Internal Communication**:
+   - After decryption, the ALB forwards requests to the ECS tasks using HTTP
+   - The internal traffic between ALB and ECS tasks remains within the VPC's secure network
+
+3. **Certificate Management**:
+   - SSL/TLS certificates are managed and deployed at the ALB level using AWS Certificate Manager (ACM)
+   - This centralizes certificate management and renewal
+
+4. **Security Considerations**:
+   - Network Firewall still inspects all traffic, including encrypted traffic to the ALB
+   - Once decrypted at the ALB, the traffic can be further inspected and filtered as it travels to the application
 
 > Note: Each AZ uses its own Network Firewall endpoint and NAT Gateway for better isolation and performance.
 
