@@ -4,6 +4,7 @@
 # AWS Configuration
 aws_region  = "us-east-1"
 aws_profile = "sbxservice-poc"  # Set to your local AWS profile
+                                # Leave empty to use environment variables or instance profile
 
 # Environment Settings
 environment = "dev"
@@ -15,6 +16,7 @@ availability_zones = ["us-east-1a", "us-east-1b"]
 
 # HTTPS Configuration
 enable_https = true
+# To enable HTTPS, uncomment the following line and provide the ARN of your ACM certificate
 # ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
 https_port = 443
 redirect_http_to_https = true 
