@@ -76,6 +76,7 @@ resource "aws_networkfirewall_firewall" "main" {
 
   delete_protection = false
 
+  # Deploy Network Firewall in public subnets to inspect traffic from Internet Gateway
   dynamic "subnet_mapping" {
     for_each = var.firewall_subnet_ids
     content {

@@ -33,15 +33,16 @@ resource "aws_subnet" "private" {
   }
 }
 
-# Firewall subnets - for Network Firewall
+# Firewall subnets - for Network Firewall (public)
 resource "aws_subnet" "firewall" {
-  count             = length(var.firewall_subnet_cidrs)
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.firewall_subnet_cidrs[count.index]
-  availability_zone = var.availability_zones[count.index % length(var.availability_zones)]
+  count                   = length(var.firewall_subnet_cidrs)
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.firewall_subnet_cidrs[count.index]
+  availability_zone       = var.availability_zones[count.index % length(var.availability_zones)]
+  map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-firewall-${count.index + 1}"
+    Name = "${var.project_name}-${var.environment}-firewall-public-${count.index + 1}"
   }
 }
 
@@ -105,28 +106,15 @@ resource "aws_route_table" "firewall" {
   }
 }
 
-# Add route to Internet Gateway for each public route table
-resource "aws_route" "public_internet_gateway" {
-  for_each               = aws_route_table.public
-  route_table_id         = each.value.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
-}
-
 # Private subnet default routes will be created by the network_firewall module
 # to route traffic through the Network Firewall endpoints in the same AZ
 
-# Add default route from firewall subnet route table to NAT Gateway in the same AZ
-resource "aws_route" "firewall_nat_gateway" {
+# Add default route from firewall subnet route table to Internet Gateway
+resource "aws_route" "firewall_internet_gateway" {
   for_each               = aws_route_table.firewall
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.main[index(var.availability_zones, each.key)].id
-
-  # In case of conflict with existing routes
-  lifecycle {
-    create_before_destroy = true
-  }
+  gateway_id             = aws_internet_gateway.main.id
 }
 
 # Associate public subnets with corresponding AZ route table

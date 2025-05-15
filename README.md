@@ -123,12 +123,27 @@ After successful application, Terraform will output:
 
 The deployment includes AWS Network Firewall for enhanced security:
 
-- Dedicated firewall subnets in each availability zone
-- Network Firewall with inspection of traffic between public and private subnets
+- Dedicated public firewall subnets in each availability zone
+- Network Firewall with inspection of traffic between Internet Gateway and public subnets
 - Custom Suricata-compatible rules for traffic inspection
 - No stateless rules or TLS inspection
+- Traffic routing through firewall endpoints for traffic from Internet Gateway to ALB
 - Traffic routing through firewall endpoints for traffic from ALB to ECS services
 - Secure return path for traffic from private subnets back to public subnets
+
+The Network Firewall is positioned at the edge of the VPC to inspect all incoming traffic before it reaches the ALB, providing an additional layer of protection for your application.
+
+### Handling Route Conflicts
+
+When deploying the Network Firewall with edge routing, you might encounter route conflicts with AWS default local routes. If you see errors like `RouteAlreadyExists`, you may need to manually delete conflicting routes before applying Terraform:
+
+```bash
+# List route tables to find the route table ID
+aws ec2 describe-route-tables --filters "Name=tag:Name,Values=*igw-edge*" --query "RouteTables[*].{ID:RouteTableId, Name:Tags[?Key=='Name'].Value|[0]}"
+
+# Delete the conflicting route
+aws ec2 delete-route --route-table-id <rtb-id> --destination-cidr-block <vpc-cidr>
+```
 
 ## Building and Deploying Applications
 
