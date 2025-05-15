@@ -115,11 +115,6 @@ resource "aws_route" "firewall_internet_gateway" {
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.main.id
-
-  # In case of conflict with existing routes
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # Associate public subnets with corresponding AZ route table
