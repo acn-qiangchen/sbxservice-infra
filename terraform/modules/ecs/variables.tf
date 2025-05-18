@@ -74,6 +74,12 @@ variable "app_count" {
   default     = 1
 }
 
+variable "acm_certificate_arn" {
+  description = "ARN of the ACM certificate for HTTPS"
+  type        = string
+  default     = ""
+}
+
 # App Mesh variables
 variable "service_mesh_enabled" {
   description = "Whether to enable App Mesh integration"

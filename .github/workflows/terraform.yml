@@ -21,6 +21,11 @@ on:
         description: 'AWS account ID for assuming the IAM role and ECR'
         required: true
         type: string
+      import_certificate:
+        description: 'Import SSL certificate from ssl-cert directory'
+        required: false
+        type: boolean
+        default: false
 
 env:
   AWS_REGION: us-east-1
@@ -54,6 +59,26 @@ jobs:
     - name: Verify AWS credentials
       run: |
         aws sts get-caller-identity
+    
+    - name: Import SSL Certificate to ACM
+      id: import-cert
+      if: ${{ github.event.inputs.import_certificate }}
+      working-directory: ssl-cert
+      run: |
+        echo "Importing SSL certificate to ACM..."
+        
+        # Import certificate to ACM
+        CERT_ARN=$(aws acm import-certificate \
+          --certificate fileb://certificate.pem \
+          --private-key fileb://privatekey.pem \
+          --certificate-chain fileb://chain.pem \
+          --output text)
+        
+        echo "Imported certificate ARN: $CERT_ARN"
+        echo "certificate_arn=$CERT_ARN" >> $GITHUB_OUTPUT
+        
+        # List certificates to verify
+        aws acm list-certificates
         
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
@@ -155,6 +180,8 @@ jobs:
         environment = "${{ github.event.inputs.environment }}"
         aws_profile = ""
         container_image_hello = "${{ steps.image-url.outputs.image_url }}"
+        # Add certificate ARN if available
+        ${{ github.event.inputs.import_certificate && format('acm_certificate_arn = "{0}"', steps.import-cert.outputs.certificate_arn) || '' }}
         EOF
         
         cat terraform.tfvars
@@ -177,6 +204,14 @@ jobs:
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "${{ steps.image-url.outputs.image_url }}" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
+        
+        # Show certificate ARN if imported
+        if [ "${{ github.event.inputs.import_certificate }}" = "true" ]; then
+          echo "#### Certificate ARN" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.import-cert.outputs.certificate_arn }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Terraform Apply
       working-directory: terraform

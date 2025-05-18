@@ -121,6 +121,9 @@ module "ecs" {
   task_memory         = 2048
   app_count           = 2
 
+  # ACM certificate for HTTPS
+  acm_certificate_arn = var.acm_certificate_arn
+
   # App Mesh integration
   service_mesh_enabled  = true
   mesh_name             = module.app_mesh.mesh_name

@@ -43,6 +43,18 @@ variable "container_image_url" {
   default     = ""
 }
 
+variable "acm_certificate_arn" {
+  description = "ARN of the ACM certificate for HTTPS on the ALB"
+  type        = string
+  default     = ""
+}
+
+variable "certificate_authority_arn" {
+  description = "ARN of the Certificate Authority (CA) to use for TLS inspection"
+  type        = string
+  default     = ""
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
