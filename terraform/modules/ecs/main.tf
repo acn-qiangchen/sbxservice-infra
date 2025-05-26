@@ -382,7 +382,7 @@ resource "aws_lb_target_group" "app" {
 
 # ALB Listener for HTTPS (when certificate is provided)
 resource "aws_lb_listener" "https" {
-  count             = var.acm_certificate_arn != "" ? 1 : 0
+  count             = var.enable_https ? 1 : 0
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"

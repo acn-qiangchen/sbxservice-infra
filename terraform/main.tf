@@ -172,6 +172,7 @@ module "ecs" {
 
   # ACM certificate for HTTPS - use the new certificate
   acm_certificate_arn = aws_acm_certificate_validation.main.certificate_arn
+  enable_https        = true
 
   # App Mesh integration
   service_mesh_enabled  = true
