@@ -2,7 +2,7 @@
 data "aws_region" "current" {}
 
 # AWS Network Firewall Policy
-resource "aws_networkfirewall_firewall_policy" "main" {
+resource "aws_networkfirewall_firewall_policy" "main2" {
   name = "${var.project_name}-${var.environment}-firewall-policy"
 
   firewall_policy {
@@ -133,8 +133,7 @@ resource "aws_networkfirewall_logging_configuration" "main" {
     }
   }
 }
-
-resource "aws_networkfirewall_tls_inspection_configuration" "main" {
+resource "aws_networkfirewall_tls_inspection_configuration" "main2" {
   name        = "${var.project_name}-${var.environment}-tls-inspection"
   description = "${var.project_name}-${var.environment}-tls-inspection"
 
