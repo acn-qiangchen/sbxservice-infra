@@ -9,7 +9,7 @@ terraform {
   #   dynamodb_table = ""
   #   encrypt        = true
   # }
-    backend "s3" {
+  backend "s3" {
     # These values will be filled dynamically during initialization
     # Do not set fixed values here as they will be provided by the workflow
     bucket         = "sbxservice-terraform-state-891376925337"
