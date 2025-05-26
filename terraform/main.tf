@@ -66,7 +66,7 @@ resource "aws_acm_certificate" "main" {
   }
 
   tags = {
-    Name = "*.${local.domain_name}"
+    Name = "wildcard-${local.domain_name}"
   }
 }
 
