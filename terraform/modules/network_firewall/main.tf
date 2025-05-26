@@ -33,7 +33,7 @@ resource "aws_networkfirewall_firewall_policy" "main2" {
     }
 
     # Add TLS inspection configuration if certificate is provided
-    tls_inspection_configuration_arn = aws_networkfirewall_tls_inspection_configuration.main.arn
+    tls_inspection_configuration_arn = aws_networkfirewall_tls_inspection_configuration.main2.arn
   }
 
   tags = {
