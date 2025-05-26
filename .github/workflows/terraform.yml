@@ -55,47 +55,6 @@ jobs:
       run: |
         aws sts get-caller-identity
     
-    - name: Check for SSL Certificates and Import if Needed
-      id: cert-management
-      run: |
-        # Check if ssl-cert directory exists
-        if [ -d "ssl-cert" ] && [ -f "ssl-cert/certificate.pem" ] && [ -f "ssl-cert/privatekey.pem" ] && [ -f "ssl-cert/chain.pem" ]; then
-          cd ssl-cert
-          echo "SSL certificate files found, checking for existing certificate..."
-          
-          # Get domain from the certificate file
-          CERT_DOMAIN=$(openssl x509 -in certificate.pem -noout -subject | grep -o "CN=[^,]*" | cut -d= -f2)
-          echo "Certificate domain: $CERT_DOMAIN"
-          
-          # Check if certificate for this domain already exists in ACM
-          EXISTING_CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='$CERT_DOMAIN'].CertificateArn" --output text)
-          
-          if [ -n "$EXISTING_CERT_ARN" ]; then
-            echo "Certificate for $CERT_DOMAIN already exists with ARN: $EXISTING_CERT_ARN"
-            echo "certificate_arn=$EXISTING_CERT_ARN" >> $GITHUB_OUTPUT
-            echo "has_certificate=true" >> $GITHUB_OUTPUT
-          else
-            echo "Importing new SSL certificate for $CERT_DOMAIN..."
-            
-            # Import certificate to ACM
-            NEW_CERT_ARN=$(aws acm import-certificate \
-              --certificate fileb://certificate.pem \
-              --private-key fileb://privatekey.pem \
-              --certificate-chain fileb://chain.pem \
-              --output text)
-            
-            echo "Imported new certificate ARN: $NEW_CERT_ARN"
-            echo "certificate_arn=$NEW_CERT_ARN" >> $GITHUB_OUTPUT
-            echo "has_certificate=true" >> $GITHUB_OUTPUT
-          fi
-          
-          # List certificates to verify
-          aws acm list-certificates
-        else
-          echo "No SSL certificate files found in ssl-cert directory, skipping certificate management"
-          echo "has_certificate=false" >> $GITHUB_OUTPUT
-        fi
-        
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
       with:
@@ -195,9 +154,8 @@ jobs:
         cat > terraform.tfvars <<EOF
         environment = "${{ github.event.inputs.environment }}"
         aws_profile = ""
+        aws_account_id = "${{ github.event.inputs.aws_account_id }}"
         container_image_hello = "${{ steps.image-url.outputs.image_url }}"
-        # Add certificate ARN if available
-        ${{ steps.cert-management.outputs.has_certificate == 'true' && format('acm_certificate_arn = "{0}"', steps.cert-management.outputs.certificate_arn) || '' }}
         EOF
         
         cat terraform.tfvars
@@ -221,13 +179,13 @@ jobs:
         echo "${{ steps.image-url.outputs.image_url }}" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         
-        # Show certificate ARN if found or imported
-        if [ "${{ steps.cert-management.outputs.has_certificate }}" = "true" ]; then
-          echo "#### Certificate ARN" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.cert-management.outputs.certificate_arn }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        fi
+        # Show domain information
+        echo "#### Domain Configuration" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "Base Domain: ${{ github.event.inputs.aws_account_id }}.realhandsonlabs.net" >> $GITHUB_STEP_SUMMARY
+        echo "ALB Domain: alb.${{ github.event.inputs.aws_account_id }}.realhandsonlabs.net" >> $GITHUB_STEP_SUMMARY
+        echo "Certificate: *.${{ github.event.inputs.aws_account_id }}.realhandsonlabs.net" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Terraform Apply
       working-directory: terraform

@@ -44,6 +44,54 @@ locals {
     },
     var.container_image_url != "" ? { hello = var.container_image_url } : {}
   )
+
+  # Construct domain names from AWS account ID
+  domain_name     = "${var.aws_account_id}.realhandsonlabs.net"
+  alb_domain_name = "alb.${var.aws_account_id}.realhandsonlabs.net"
+}
+
+# Data source for existing hosted zone
+data "aws_route53_zone" "main" {
+  name         = local.domain_name
+  private_zone = false
+}
+
+# ACM Certificate with DNS validation
+resource "aws_acm_certificate" "main" {
+  domain_name       = "*.${local.domain_name}"
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name = "*.${local.domain_name}"
+  }
+}
+
+# DNS validation records
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.main.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+# Certificate validation
+resource "aws_acm_certificate_validation" "main" {
+  certificate_arn         = aws_acm_certificate.main.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
 # VPC and Network Configuration
@@ -79,6 +127,7 @@ module "network_firewall" {
   nat_gateway_ids             = module.vpc.nat_gateway_ids
   nat_gateway_ids_by_az       = module.vpc.nat_gateway_ids_by_az
   availability_zones          = var.availability_zones
+  alb_certificate_arn         = aws_acm_certificate_validation.main.certificate_arn
 }
 
 # Security Groups
@@ -121,14 +170,27 @@ module "ecs" {
   task_memory         = 2048
   app_count           = 2
 
-  # ACM certificate for HTTPS
-  acm_certificate_arn = var.acm_certificate_arn
+  # ACM certificate for HTTPS - use the new certificate
+  acm_certificate_arn = aws_acm_certificate_validation.main.certificate_arn
 
   # App Mesh integration
   service_mesh_enabled  = true
   mesh_name             = module.app_mesh.mesh_name
   virtual_node_name     = module.app_mesh.virtual_node_name
   service_discovery_arn = module.app_mesh.service_discovery_service_arn
+}
+
+# Route53 A record for ALB custom domain
+resource "aws_route53_record" "alb" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.alb_domain_name
+  type    = "A"
+
+  alias {
+    name                   = module.ecs.alb_dns_name
+    zone_id                = module.ecs.alb_zone_id
+    evaluate_target_health = true
+  }
 }
 
 # API Gateway
@@ -140,7 +202,7 @@ module "api_gateway" {
   public_subnets  = module.vpc.public_subnets
   public_sg_id    = module.security_groups.public_sg_id
   lb_listener_arn = module.ecs.lb_listener_arn
-  alb_dns_name    = module.ecs.alb_dns_name
+  alb_dns_name    = local.alb_domain_name
 }
 
 # CloudWatch Log Groups
@@ -193,4 +255,25 @@ output "network_firewall_alert_logs" {
 output "container_images" {
   description = "Map of container images being used for each service"
   value       = local.container_images
+}
+
+# Certificate and domain outputs
+output "certificate_arn" {
+  description = "ARN of the ACM certificate"
+  value       = aws_acm_certificate_validation.main.certificate_arn
+}
+
+output "domain_name" {
+  description = "Base domain name"
+  value       = local.domain_name
+}
+
+output "alb_custom_domain" {
+  description = "Custom domain name for the ALB"
+  value       = local.alb_domain_name
+}
+
+output "alb_custom_domain_url" {
+  description = "HTTPS URL for the ALB custom domain"
+  value       = "https://${local.alb_domain_name}"
 } 

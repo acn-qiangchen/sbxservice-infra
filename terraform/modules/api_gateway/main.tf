@@ -28,7 +28,7 @@ resource "aws_api_gateway_integration" "root_integration" {
 
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
-  uri                     = "http://${var.alb_dns_name}/"
+  uri                     = "https://${var.alb_dns_name}/"
 }
 
 # Proxy resource for all other paths
@@ -58,7 +58,7 @@ resource "aws_api_gateway_integration" "proxy_integration" {
 
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
-  uri                     = "http://${var.alb_dns_name}/{proxy}"
+  uri                     = "https://${var.alb_dns_name}/{proxy}"
 
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"

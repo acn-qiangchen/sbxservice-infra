@@ -10,6 +10,11 @@ variable "aws_profile" {
   default     = ""
 }
 
+variable "aws_account_id" {
+  description = "AWS account ID for domain construction and ECR"
+  type        = string
+}
+
 variable "environment" {
   description = "Environment name (e.g., dev, test, prod)"
   type        = string
@@ -39,18 +44,6 @@ variable "container_images" {
 # Keeping for backward compatibility
 variable "container_image_url" {
   description = "URL of the main container image in ECR (from another repository) - DEPRECATED: use container_image_hello instead"
-  type        = string
-  default     = ""
-}
-
-variable "acm_certificate_arn" {
-  description = "ARN of the ACM certificate for HTTPS on the ALB"
-  type        = string
-  default     = ""
-}
-
-variable "certificate_authority_arn" {
-  description = "ARN of the Certificate Authority (CA) to use for TLS inspection"
   type        = string
   default     = ""
 }
