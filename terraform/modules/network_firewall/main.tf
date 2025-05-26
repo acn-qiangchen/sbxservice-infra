@@ -74,7 +74,7 @@ EOF
 # AWS Network Firewall
 resource "aws_networkfirewall_firewall" "main" {
   name                = "${var.project_name}-${var.environment}-network-firewall"
-  firewall_policy_arn = aws_networkfirewall_firewall_policy.main.arn
+  firewall_policy_arn = aws_networkfirewall_firewall_policy.main2.arn
   vpc_id              = var.vpc_id
 
   delete_protection = false
