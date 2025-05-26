@@ -33,12 +33,7 @@ resource "aws_networkfirewall_firewall_policy" "main" {
     }
 
     # Add TLS inspection configuration if certificate is provided
-    dynamic "tls_inspection_configuration_arn" {
-      for_each = var.alb_certificate_arn != "" ? [1] : []
-      content {
-        tls_inspection_configuration_arn = aws_networkfirewall_tls_inspection_configuration.main.arn
-      }
-    }
+    tls_inspection_configuration_arn = aws_networkfirewall_tls_inspection_configuration.main.arn
   }
 
   tags = {
