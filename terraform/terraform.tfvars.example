@@ -11,7 +11,7 @@ project_name = "sbxservice"
 
 # VPC Configuration
 vpc_cidr = "10.0.0.0/16"
-availability_zones = ["us-east-1a", "us-east-1b"]
+availability_zones = ["us-east-1a", "us-east-1b"] 
 
 # Certificate ARNs
 # acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/example-cert-id"  # For HTTPS on ALB

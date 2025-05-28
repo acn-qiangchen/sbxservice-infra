@@ -165,8 +165,11 @@ resource "aws_networkfirewall_tls_inspection_configuration" "main2" {
           from_port = 443
           to_port   = 443
         }
-        destination {
-          address_definition = join(",", var.public_subnet_cidrs)
+        dynamic "destination" {
+          for_each = var.public_subnet_cidrs
+          content {
+            address_definition = destination.value
+          }
         }
         source_ports {
           from_port = 0
