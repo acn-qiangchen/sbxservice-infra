@@ -111,6 +111,15 @@ resource "aws_cloudwatch_log_group" "network_firewall_alert" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "network_firewall_tls" {
+  name              = "/aws/network-firewall/${var.project_name}-${var.environment}/tls"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-network-firewall-tls-logs"
+  }
+}
+
 # Configure Network Firewall logging
 resource "aws_networkfirewall_logging_configuration" "main" {
   firewall_arn = aws_networkfirewall_firewall.main.arn
@@ -130,6 +139,14 @@ resource "aws_networkfirewall_logging_configuration" "main" {
       }
       log_destination_type = "CloudWatchLogs"
       log_type             = "ALERT"
+    }
+
+    log_destination_config {
+      log_destination = {
+        logGroup = aws_cloudwatch_log_group.network_firewall_tls.name
+      }
+      log_destination_type = "CloudWatchLogs"
+      log_type             = "TLS"
     }
   }
 }

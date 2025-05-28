@@ -33,6 +33,11 @@ output "alert_log_group" {
   value       = aws_cloudwatch_log_group.network_firewall_alert.name
 }
 
+output "tls_log_group" {
+  description = "CloudWatch Log Group for Network Firewall TLS logs"
+  value       = aws_cloudwatch_log_group.network_firewall_tls.name
+}
+
 output "firewall_endpoints_by_az" {
   description = "Map of AZ to Network Firewall endpoint IDs"
   value       = local.firewall_endpoints_by_az

@@ -252,6 +252,11 @@ output "network_firewall_alert_logs" {
   value       = module.network_firewall.alert_log_group
 }
 
+output "network_firewall_tls_logs" {
+  description = "CloudWatch Log Group for Network Firewall TLS logs"
+  value       = module.network_firewall.tls_log_group
+}
+
 # Output container images being used
 output "container_images" {
   description = "Map of container images being used for each service"
