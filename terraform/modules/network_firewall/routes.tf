@@ -63,6 +63,10 @@ resource "aws_route" "public_to_internet_via_firewall" {
   destination_cidr_block = "0.0.0.0/0"
   vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   depends_on = [aws_networkfirewall_firewall.main]
 }
 
