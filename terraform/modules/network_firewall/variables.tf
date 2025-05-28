@@ -75,4 +75,10 @@ variable "firewall_route_tables_by_az" {
 variable "availability_zones" {
   description = "List of availability zones to use"
   type        = list(string)
+}
+
+variable "alb_certificate_arn" {
+  description = "ARN of the ALB certificate to use for TLS inspection of inbound traffic"
+  type        = string
+  default     = ""
 } 

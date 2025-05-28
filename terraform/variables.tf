@@ -10,6 +10,11 @@ variable "aws_profile" {
   default     = ""
 }
 
+variable "aws_account_id" {
+  description = "AWS account ID for domain construction and ECR"
+  type        = string
+}
+
 variable "environment" {
   description = "Environment name (e.g., dev, test, prod)"
   type        = string

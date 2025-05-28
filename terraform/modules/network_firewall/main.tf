@@ -2,7 +2,7 @@
 data "aws_region" "current" {}
 
 # AWS Network Firewall Policy
-resource "aws_networkfirewall_firewall_policy" "main" {
+resource "aws_networkfirewall_firewall_policy" "main2" {
   name = "${var.project_name}-${var.environment}-firewall-policy"
 
   firewall_policy {
@@ -13,7 +13,7 @@ resource "aws_networkfirewall_firewall_policy" "main" {
       rule_variables {
         key = "HOME_NET"
         ip_set {
-          definition = var.private_subnet_cidrs
+          definition = var.public_subnet_cidrs
         }
       }
     }
@@ -31,6 +31,9 @@ resource "aws_networkfirewall_firewall_policy" "main" {
       resource_arn = "arn:aws:network-firewall:${data.aws_region.current.name}:aws-managed:stateful-rulegroup/ThreatSignaturesScannersStrictOrder"
       priority     = 10
     }
+
+    # Add TLS inspection configuration if certificate is provided
+    tls_inspection_configuration_arn = aws_networkfirewall_tls_inspection_configuration.main2.arn
   }
 
   tags = {
@@ -71,7 +74,7 @@ EOF
 # AWS Network Firewall
 resource "aws_networkfirewall_firewall" "main" {
   name                = "${var.project_name}-${var.environment}-network-firewall"
-  firewall_policy_arn = aws_networkfirewall_firewall_policy.main.arn
+  firewall_policy_arn = aws_networkfirewall_firewall_policy.main2.arn
   vpc_id              = var.vpc_id
 
   delete_protection = false
@@ -108,6 +111,15 @@ resource "aws_cloudwatch_log_group" "network_firewall_alert" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "network_firewall_tls" {
+  name              = "/aws/network-firewall/${var.project_name}-${var.environment}/tls"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-network-firewall-tls-logs"
+  }
+}
+
 # Configure Network Firewall logging
 resource "aws_networkfirewall_logging_configuration" "main" {
   firewall_arn = aws_networkfirewall_firewall.main.arn
@@ -128,30 +140,45 @@ resource "aws_networkfirewall_logging_configuration" "main" {
       log_destination_type = "CloudWatchLogs"
       log_type             = "ALERT"
     }
+
+    log_destination_config {
+      log_destination = {
+        logGroup = aws_cloudwatch_log_group.network_firewall_tls.name
+      }
+      log_destination_type = "CloudWatchLogs"
+      log_type             = "TLS"
+    }
   }
 }
+resource "aws_networkfirewall_tls_inspection_configuration" "main2" {
+  name        = "${var.project_name}-${var.environment}-tls-inspection"
+  description = "${var.project_name}-${var.environment}-tls-inspection"
 
-# We'll need to use a terraform output and apply in two stages
-# Stage 1: Create the firewall without routes
-# Stage 2: Use terraform output to get the endpoints and apply routes in second run
-
-# We need to output the firewall details after creation
-# Then use a target approach to create Network Firewall first
-# Then add routes in a subsequent apply
-
-# These routes must be added manually after the firewall is created
-# and endpoints are known
-
-# Example Go-Traffic route (ALB -> ECS through Firewall)
-# resource "aws_route" "alb_to_ecs_through_firewall" {
-#   route_table_id         = lookup(var.public_route_tables_by_az, each.key, null)
-#   destination_cidr_block = each.value.destination_cidr
-#   vpc_endpoint_id        = each.value.endpoint_id
-# }
-
-# Example Return-Traffic route (ECS -> ALB through Firewall)
-# resource "aws_route" "ecs_to_alb_through_firewall" {
-#   route_table_id         = lookup(var.private_route_tables_by_az, each.key, null)
-#   destination_cidr_block = each.value.destination_cidr
-#   vpc_endpoint_id        = each.value.endpoint_id
-# } 
+  tls_inspection_configuration {
+    server_certificate_configuration {
+      server_certificate {
+        resource_arn = var.alb_certificate_arn
+      }
+      scope {
+        protocols = [6]
+        destination_ports {
+          from_port = 443
+          to_port   = 443
+        }
+        dynamic "destination" {
+          for_each = var.public_subnet_cidrs
+          content {
+            address_definition = destination.value
+          }
+        }
+        source_ports {
+          from_port = 0
+          to_port   = 65535
+        }
+        source {
+          address_definition = "0.0.0.0/0"
+        }
+      }
+    }
+  }
+}

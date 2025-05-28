@@ -15,7 +15,7 @@ output "firewall_status" {
 
 output "firewall_policy_id" {
   description = "ID of the Network Firewall Policy"
-  value       = aws_networkfirewall_firewall_policy.main.id
+  value       = aws_networkfirewall_firewall_policy.main2.id
 }
 
 output "custom_http_rule_group_arn" {
@@ -31,6 +31,11 @@ output "flow_log_group" {
 output "alert_log_group" {
   description = "CloudWatch Log Group for Network Firewall alert logs"
   value       = aws_cloudwatch_log_group.network_firewall_alert.name
+}
+
+output "tls_log_group" {
+  description = "CloudWatch Log Group for Network Firewall TLS logs"
+  value       = aws_cloudwatch_log_group.network_firewall_tls.name
 }
 
 output "firewall_endpoints_by_az" {

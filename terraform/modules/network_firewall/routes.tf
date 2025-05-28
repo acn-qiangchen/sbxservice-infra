@@ -55,13 +55,17 @@ resource "aws_route" "igw_to_public_via_firewall" {
 }
 
 # 2. PUBLIC SUBNET ROUTES: Default route for all outbound traffic to Network Firewall
-# Each public subnet routes outbound traffic to the firewall endpoint in its own AZ
+# Each public subnet routes outbound traffic to the firewall endpoint in its own AZ for inspection
 resource "aws_route" "public_to_internet_via_firewall" {
   for_each = var.public_route_tables_by_az
 
   route_table_id         = each.value
   destination_cidr_block = "0.0.0.0/0"
   vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   depends_on = [aws_networkfirewall_firewall.main]
 }

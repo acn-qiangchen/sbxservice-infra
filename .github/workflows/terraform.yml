@@ -54,7 +54,7 @@ jobs:
     - name: Verify AWS credentials
       run: |
         aws sts get-caller-identity
-        
+    
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
       with:
@@ -154,6 +154,7 @@ jobs:
         cat > terraform.tfvars <<EOF
         environment = "${{ github.event.inputs.environment }}"
         aws_profile = ""
+        aws_account_id = "${{ github.event.inputs.aws_account_id }}"
         container_image_hello = "${{ steps.image-url.outputs.image_url }}"
         EOF
         
@@ -176,6 +177,14 @@ jobs:
         echo "#### Container Image" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "${{ steps.image-url.outputs.image_url }}" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+        # Show domain information
+        echo "#### Domain Configuration" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "Base Domain: ${{ github.event.inputs.aws_account_id }}.realhandsonlabs.net" >> $GITHUB_STEP_SUMMARY
+        echo "ALB Domain: alb.${{ github.event.inputs.aws_account_id }}.realhandsonlabs.net" >> $GITHUB_STEP_SUMMARY
+        echo "Certificate: *.${{ github.event.inputs.aws_account_id }}.realhandsonlabs.net" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Terraform Apply
