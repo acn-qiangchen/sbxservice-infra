@@ -13,7 +13,7 @@ resource "aws_networkfirewall_firewall_policy" "main2" {
       rule_variables {
         key = "HOME_NET"
         ip_set {
-          definition = var.private_subnet_cidrs
+          definition = var.public_subnet_cidrs
         }
       }
     }
@@ -166,7 +166,7 @@ resource "aws_networkfirewall_tls_inspection_configuration" "main2" {
           to_port   = 443
         }
         destination {
-          address_definition = "0.0.0.0/0"
+          address_definition = join(",", var.public_subnet_cidrs)
         }
         source_ports {
           from_port = 0

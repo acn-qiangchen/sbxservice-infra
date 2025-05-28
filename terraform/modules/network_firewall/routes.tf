@@ -54,14 +54,14 @@ resource "aws_route" "igw_to_public_via_firewall" {
   depends_on = [aws_networkfirewall_firewall.main]
 }
 
-# 2. PUBLIC SUBNET ROUTES: Default route for all outbound traffic directly to Internet Gateway
-# Skip firewall inspection for outbound traffic from public subnets
-resource "aws_route" "public_to_internet_direct" {
+# 2. PUBLIC SUBNET ROUTES: Default route for all outbound traffic to Network Firewall
+# Each public subnet routes outbound traffic to the firewall endpoint in its own AZ for inspection
+resource "aws_route" "public_to_internet_via_firewall" {
   for_each = var.public_route_tables_by_az
 
   route_table_id         = each.value
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = var.internet_gateway_id
+  vpc_endpoint_id        = local.firewall_endpoints_by_az[each.key]
 
   depends_on = [aws_networkfirewall_firewall.main]
 }
