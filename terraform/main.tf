@@ -139,7 +139,7 @@ module "ecs" {
   container_port      = 8080
   task_cpu            = 1024
   task_memory         = 2048
-  app_count           = 2
+  app_count           = 1
 
   # ACM certificate for HTTPS - use the new certificate
   acm_certificate_arn = aws_acm_certificate_validation.main.certificate_arn
@@ -147,7 +147,7 @@ module "ecs" {
 
   # Kong Gateway configuration
   kong_enabled   = var.kong_enabled
-  kong_app_count = 2
+  kong_app_count = 1
 }
 
 # Route53 A record for ALB custom domain
