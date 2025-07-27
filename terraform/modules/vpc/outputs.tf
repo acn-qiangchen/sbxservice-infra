@@ -13,10 +13,7 @@ output "private_subnets" {
   value       = aws_subnet.private[*].id
 }
 
-output "firewall_subnets" {
-  description = "List of IDs of firewall subnets"
-  value       = aws_subnet.firewall[*].id
-}
+
 
 output "public_subnet_cidrs" {
   description = "List of CIDR blocks of public subnets"
@@ -69,7 +66,4 @@ output "private_route_tables_by_az" {
   value       = { for az, rt in aws_route_table.private : az => rt.id }
 }
 
-output "firewall_route_tables_by_az" {
-  description = "Map of AZ to firewall route table IDs"
-  value       = { for az, rt in aws_route_table.firewall : az => rt.id }
-} 
+ 

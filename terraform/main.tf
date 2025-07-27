@@ -104,41 +104,19 @@ module "vpc" {
   availability_zones = var.availability_zones
   project_name       = var.project_name
 
-  public_subnet_cidrs   = var.public_subnet_cidrs
-  private_subnet_cidrs  = var.private_subnet_cidrs
-  firewall_subnet_cidrs = var.firewall_subnet_cidrs
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
 }
 
-# Network Firewall - using VPC outputs
-module "network_firewall" {
-  source = "./modules/network_firewall"
 
-  project_name                = var.project_name
-  environment                 = var.environment
-  vpc_id                      = module.vpc.vpc_id
-  vpc_cidr                    = var.vpc_cidr
-  internet_gateway_id         = module.vpc.internet_gateway_id
-  firewall_subnet_ids         = module.vpc.firewall_subnets
-  public_subnet_cidrs         = module.vpc.public_subnet_cidrs
-  private_subnet_cidrs        = module.vpc.private_subnet_cidrs
-  public_route_tables_by_az   = module.vpc.public_route_tables_by_az
-  private_route_tables_by_az  = module.vpc.private_route_tables_by_az
-  firewall_route_tables_by_az = module.vpc.firewall_route_tables_by_az
-  nat_gateway_id              = module.vpc.nat_gateway_id
-  nat_gateway_ids             = module.vpc.nat_gateway_ids
-  nat_gateway_ids_by_az       = module.vpc.nat_gateway_ids_by_az
-  availability_zones          = var.availability_zones
-  alb_certificate_arn         = aws_acm_certificate_validation.main.certificate_arn
-}
 
 # Security Groups
 module "security_groups" {
   source = "./modules/security_groups"
 
-  environment      = var.environment
-  vpc_id           = module.vpc.vpc_id
-  vpc_cidr         = var.vpc_cidr
-  firewall_subnets = module.vpc.firewall_subnets
+  environment = var.environment
+  vpc_id      = module.vpc.vpc_id
+  vpc_cidr    = var.vpc_cidr
 }
 
 
@@ -220,30 +198,7 @@ output "alb_dns_name" {
 
 
 
-output "network_firewall_status" {
-  description = "Network Firewall status details"
-  value       = module.network_firewall.firewall_status
-}
 
-output "firewall_policy_id" {
-  description = "ID of the Network Firewall Policy"
-  value       = module.network_firewall.firewall_policy_id
-}
-
-output "network_firewall_flow_logs" {
-  description = "CloudWatch Log Group for Network Firewall flow logs"
-  value       = module.network_firewall.flow_log_group
-}
-
-output "network_firewall_alert_logs" {
-  description = "CloudWatch Log Group for Network Firewall alert logs"
-  value       = module.network_firewall.alert_log_group
-}
-
-output "network_firewall_tls_logs" {
-  description = "CloudWatch Log Group for Network Firewall TLS logs"
-  value       = module.network_firewall.tls_log_group
-}
 
 # Output container images being used
 output "container_images" {

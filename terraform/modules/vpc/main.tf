@@ -33,18 +33,7 @@ resource "aws_subnet" "private" {
   }
 }
 
-# Firewall subnets - for Network Firewall (public)
-resource "aws_subnet" "firewall" {
-  count                   = length(var.firewall_subnet_cidrs)
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.firewall_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index % length(var.availability_zones)]
-  map_public_ip_on_launch = true
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-firewall-public-${count.index + 1}"
-  }
-}
 
 # Internet Gateway
 resource "aws_internet_gateway" "main" {
@@ -96,25 +85,22 @@ resource "aws_route_table" "private" {
   }
 }
 
-# Create firewall route tables per AZ
-resource "aws_route_table" "firewall" {
-  for_each = { for i, az in var.availability_zones : az => i }
-  vpc_id   = aws_vpc.main.id
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-firewall-rt-${each.key}"
-  }
-}
 
-# Private subnet default routes will be created by the network_firewall module
-# to route traffic through the Network Firewall endpoints in the same AZ
-
-# Add default route from firewall subnet route table to Internet Gateway
-resource "aws_route" "firewall_internet_gateway" {
-  for_each               = aws_route_table.firewall
+# Add default route from public subnet route tables to Internet Gateway
+resource "aws_route" "public_internet_gateway" {
+  for_each               = aws_route_table.public
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.main.id
+}
+
+# Add default route from private subnet route tables to NAT Gateway
+resource "aws_route" "private_nat_gateway" {
+  for_each               = aws_route_table.private
+  route_table_id         = each.value.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.main[index(var.availability_zones, each.key)].id
 }
 
 # Associate public subnets with corresponding AZ route table
@@ -131,12 +117,7 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private[var.availability_zones[count.index % length(var.availability_zones)]].id
 }
 
-# Associate firewall subnets with corresponding AZ route table
-resource "aws_route_table_association" "firewall" {
-  count          = length(var.firewall_subnet_cidrs)
-  subnet_id      = aws_subnet.firewall[count.index].id
-  route_table_id = aws_route_table.firewall[var.availability_zones[count.index % length(var.availability_zones)]].id
-}
+
 
 # VPC endpoints for ECR
 resource "aws_vpc_endpoint" "ecr_api" {
