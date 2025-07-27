@@ -358,7 +358,7 @@ resource "aws_ecs_task_definition" "kong_gateway" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+        command     = ["CMD-SHELL", "kong health || exit 1"]
         interval    = 30
         retries     = 3
         timeout     = 5
