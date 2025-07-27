@@ -298,8 +298,8 @@ resource "aws_secretsmanager_secret" "kong_cluster_cert" {
 }
 
 resource "aws_secretsmanager_secret_version" "kong_cluster_cert" {
-  count     = var.kong_enabled ? 1 : 0
-  secret_id = aws_secretsmanager_secret.kong_cluster_cert[0].id
+  count         = var.kong_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.kong_cluster_cert[0].id
   secret_string = "-----BEGIN CERTIFICATE-----\nMIICKTCCAdCgAwIBAgIBATAKBggqhkjOPQQDBDBGMUQwCQYDVQQGEwJJTjA3BgNV\nBAMeMABrAG8AbgBuAGUAYwB0AC0AbABhAG0AcAAtAHAAbwBjAC0AZwBhAHQAZQB3\nAGEAeTAeFw0yNTA3MjcwNTU4NDFaFw0zNTA3MjcwNTU4NDFaMEYxRDAJBgNVBAYT\nAklOMDcGA1UEAx4wAGsAbwBuAG4AZQBjAHQALQBsAGEAbQBwAC0AcABvAGMALQBn\nAGEAdABlAHcAYQB5MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuP7Dt4ib61GD\nXzvu8gYmexoSeAEsxP3mtZMkhve6ReqAKgG7iC5jKL3Cpy3+z+PZ3NQA+ZQRmRJa\noKurc+P6LKOBrjCBqzAMBgNVHRMBAf8EAjAAMAsGA1UdDwQEAwIABjAdBgNVHSUE\nFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwFwYJKwYBBAGCNxQCBAoMCGNlcnRUeXBl\nMCMGCSsGAQQBgjcVAgQWBBQBAQEBAQEBAQEBAQEBAQEBAQEBATAcBgkrBgEEAYI3\nFQcEDzANBgUpAQEBAQIBCgIBFDATBgkrBgEEAYI3FQEEBgIEABQACjAKBggqhkjO\nPQQDBANHADBEAiAB3RZjBRvICZjAMPxo1mMeRKFqJxWbN6jCuW3xaV6uXAIgaxSE\nMT0X1vjWHO1PkpqjLRbm5ibaDDJ0z0DepwMq7ZI=\n-----END CERTIFICATE-----"
 }
 
@@ -314,8 +314,8 @@ resource "aws_secretsmanager_secret" "kong_cluster_cert_key" {
 }
 
 resource "aws_secretsmanager_secret_version" "kong_cluster_cert_key" {
-  count     = var.kong_enabled ? 1 : 0
-  secret_id = aws_secretsmanager_secret.kong_cluster_cert_key[0].id
+  count         = var.kong_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.kong_cluster_cert_key[0].id
   secret_string = "-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgomvslPtc3x9O32Rf\nAwVd8rfQ8v12KbgB8q90XWbeAeCgCgYIKoZIzj0DAQehRANCAAS4/sO3iJvrUYNf\nO+7yBiZ7GhJ4ASzE/ea1kySG97pF6oAqAbuILmMovcKnLf7P49nc1AD5lBGZElqg\nq6tz4/os\n-----END PRIVATE KEY-----"
 }
 
@@ -475,12 +475,12 @@ resource "aws_lb_target_group" "app" {
 # Data source to get Kong NLB IP addresses for ALB target group
 data "aws_network_interface" "kong_nlb_eni" {
   count = var.kong_enabled ? length(var.private_subnets) : 0
-  
+
   filter {
     name   = "description"
     values = ["ELB ${aws_lb.kong_nlb[0].arn_suffix}"]
   }
-  
+
   filter {
     name   = "subnet-id"
     values = [var.private_subnets[count.index]]
@@ -575,7 +575,7 @@ resource "aws_lb" "kong_nlb" {
   load_balancer_type = "network"
   subnets            = var.private_subnets
 
-  enable_deletion_protection = false
+  enable_deletion_protection       = false
   enable_cross_zone_load_balancing = true
 
   tags = {
