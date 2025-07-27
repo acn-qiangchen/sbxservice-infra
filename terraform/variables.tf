@@ -34,6 +34,12 @@ variable "container_image_hello" {
   default     = ""
 }
 
+variable "container_image_kong" {
+  description = "URL of the container image for the Kong Gateway service"
+  type        = string
+  default     = ""
+}
+
 # Map of all container images (constructed from individual image variables)
 variable "container_images" {
   description = "Map of container images for different services (derived from container_image_* variables)"
@@ -46,6 +52,13 @@ variable "container_image_url" {
   description = "URL of the main container image in ECR (from another repository) - DEPRECATED: use container_image_hello instead"
   type        = string
   default     = ""
+}
+
+# Kong Gateway configuration
+variable "kong_enabled" {
+  description = "Whether to enable Kong Gateway service"
+  type        = bool
+  default     = true
 }
 
 variable "vpc_cidr" {

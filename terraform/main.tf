@@ -40,6 +40,7 @@ locals {
     {
       for k, v in {
         hello = var.container_image_hello,
+        kong  = var.container_image_kong,
       } : k => v if v != ""
     },
     var.container_image_url != "" ? { hello = var.container_image_url } : {}
@@ -140,15 +141,7 @@ module "security_groups" {
   firewall_subnets = module.vpc.firewall_subnets
 }
 
-# App Mesh for Service Mesh
-module "app_mesh" {
-  source = "./modules/app_mesh"
 
-  project_name   = var.project_name
-  environment    = var.environment
-  vpc_id         = module.vpc.vpc_id
-  container_port = 8080
-}
 
 # ECS Fargate for Spring Boot Application
 module "ecs" {
@@ -174,11 +167,9 @@ module "ecs" {
   acm_certificate_arn = aws_acm_certificate_validation.main.certificate_arn
   enable_https        = true
 
-  # App Mesh integration
-  service_mesh_enabled  = true
-  mesh_name             = module.app_mesh.mesh_name
-  virtual_node_name     = module.app_mesh.virtual_node_name
-  service_discovery_arn = module.app_mesh.service_discovery_service_arn
+  # Kong Gateway configuration
+  kong_enabled   = var.kong_enabled
+  kong_app_count = 2
 }
 
 # Route53 A record for ALB custom domain
@@ -227,10 +218,7 @@ output "alb_dns_name" {
   value       = module.ecs.alb_dns_name
 }
 
-output "mesh_name" {
-  description = "The name of the App Mesh service mesh"
-  value       = module.app_mesh.mesh_name
-}
+
 
 output "network_firewall_status" {
   description = "Network Firewall status details"
@@ -282,4 +270,36 @@ output "alb_custom_domain" {
 output "alb_custom_domain_url" {
   description = "HTTPS URL for the ALB custom domain"
   value       = "https://${local.alb_domain_name}"
+}
+
+# Kong Gateway outputs
+output "kong_nlb_dns_name" {
+  description = "DNS name of the Kong Gateway Network Load Balancer"
+  value       = module.ecs.kong_nlb_dns_name
+}
+
+output "kong_service_name" {
+  description = "Name of the Kong Gateway ECS service"
+  value       = module.ecs.kong_service_name
+}
+
+output "kong_enabled" {
+  description = "Whether Kong Gateway is enabled"
+  value       = var.kong_enabled
+}
+
+# Service Discovery outputs
+output "service_discovery_namespace" {
+  description = "Service discovery namespace name"
+  value       = module.ecs.service_discovery_namespace_name
+}
+
+output "hello_service_dns_name" {
+  description = "DNS name for hello-service discovery"
+  value       = "${var.project_name}.${module.ecs.service_discovery_namespace_name}"
+}
+
+output "kong_service_dns_name" {
+  description = "DNS name for Kong Gateway service discovery"
+  value       = var.kong_enabled ? "kong-gateway.${module.ecs.service_discovery_namespace_name}" : null
 } 
