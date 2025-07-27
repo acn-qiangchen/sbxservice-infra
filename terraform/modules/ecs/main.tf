@@ -149,10 +149,10 @@ resource "aws_iam_policy" "kong_secrets_policy" {
   })
 }
 
-# Attach Kong secrets policy to task role
-resource "aws_iam_role_policy_attachment" "task_kong_secrets" {
+# Attach Kong secrets policy to execution role (needed for retrieving secrets during startup)
+resource "aws_iam_role_policy_attachment" "execution_kong_secrets" {
   count      = var.kong_enabled ? 1 : 0
-  role       = aws_iam_role.ecs_task_role.name
+  role       = aws_iam_role.ecs_execution_role.name
   policy_arn = aws_iam_policy.kong_secrets_policy[0].arn
 }
 
