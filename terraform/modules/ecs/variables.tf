@@ -100,5 +100,5 @@ variable "kong_enabled" {
 variable "kong_app_count" {
   description = "Number of Kong Gateway containers to run"
   type        = number
-  default     = 2
+  default     = 1
 } 
