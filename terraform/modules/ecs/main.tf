@@ -347,6 +347,11 @@ resource "aws_ecs_task_definition" "kong_gateway" {
           containerPort = 8443
           hostPort      = 8443
           protocol      = "tcp"
+        },
+        {
+          containerPort = 8100
+          hostPort      = 8100
+          protocol      = "tcp"
         }
       ]
       logConfiguration = {
@@ -412,6 +417,10 @@ resource "aws_ecs_task_definition" "kong_gateway" {
         {
           name  = "KONG_ROUTER_FLAVOR"
           value = "expressions"
+        },
+        {
+          name  = "KONG_STATUS_LISTEN"
+          value = "0.0.0.0:8100"
         }
       ]
       secrets = [
@@ -598,9 +607,9 @@ resource "aws_lb_target_group" "kong" {
     unhealthy_threshold = 3
     interval            = 30
     protocol            = "HTTP"
-    port                = "8000"
-    path                = "/"
-    matcher             = "200-399"
+    port                = "8100"
+    path                = "/status/ready"
+    matcher             = "200"
   }
 
   tags = {
