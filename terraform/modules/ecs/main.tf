@@ -468,12 +468,13 @@ resource "aws_lb_target_group" "app" {
   target_type = "ip"
 
   health_check {
-    path                = var.kong_enabled ? "/" : "/actuator/health"
+    path                = var.kong_enabled ? "/status/ready" : "/actuator/health"
+    port                = var.kong_enabled ? "8100" : "traffic-port"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 3
     unhealthy_threshold = 3
-    matcher             = var.kong_enabled ? "200-399" : "200"
+    matcher             = "200"
   }
 
   tags = {
