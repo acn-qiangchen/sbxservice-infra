@@ -441,6 +441,17 @@ resource "aws_ecs_task_definition" "kong_gateway" {
   }
 }
 
+# ============================================================================
+# LOAD BALANCER ARCHITECTURE:
+# 
+# ALB (Internet-facing) → NLB (Internal) → Kong Gateway (ECS) → Hello Service (ECS)
+#
+# Target Groups:
+# 1. ALB Target Group    → Points to NLB IPs (connects ALB to NLB)
+# 2. NLB Target Group 1  → Points to Kong containers port 8000 (application traffic)  
+# 3. NLB Target Group 2  → Points to Kong containers port 8100 (health checks)
+# ============================================================================
+
 # Application Load Balancer
 resource "aws_lb" "main" {
   name               = "${var.project_name}-${var.environment}-alb"
@@ -459,9 +470,9 @@ resource "aws_lb" "main" {
   }
 }
 
-# Target Group for ALB - points to Kong Gateway NLB when Kong is enabled
+# ALB Target Group - Routes traffic from ALB to NLB (when Kong enabled) or Hello-Service (when Kong disabled)
 resource "aws_lb_target_group" "app" {
-  name        = "${var.project_name}-${var.environment}-tg"
+  name        = "${var.project_name}-${var.environment}-alb-tg"
   port        = var.kong_enabled ? 8000 : var.container_port
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -478,11 +489,11 @@ resource "aws_lb_target_group" "app" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-tg"
+    Name = "${var.project_name}-${var.environment}-alb-tg"
   }
 }
 
-# Data source to get Kong NLB IP addresses for ALB target group
+# Data source to get Kong NLB private IP addresses for connecting ALB to NLB
 data "aws_network_interface" "kong_nlb_eni" {
   count = var.kong_enabled ? length(var.private_subnets) : 0
 
@@ -497,14 +508,14 @@ data "aws_network_interface" "kong_nlb_eni" {
   }
 }
 
-# Target Group Attachment for Kong NLB IPs (when Kong is enabled)
+# ALB to NLB Connection - Attaches Kong NLB IPs to ALB target group (connects ALB → NLB → Kong)
 resource "aws_lb_target_group_attachment" "kong_nlb" {
   count            = var.kong_enabled ? length(var.private_subnets) : 0
   target_group_arn = aws_lb_target_group.app.arn
   target_id        = data.aws_network_interface.kong_nlb_eni[count.index].private_ip
-  port             = 8000
+  port             = 8100
 
-  depends_on = [aws_lb.kong_nlb]
+  depends_on = [aws_lb.kong_nlb, aws_lb_listener.kong_nlb_health]
 }
 
 # ALB Listener for HTTPS (when certificate is provided)
@@ -593,10 +604,10 @@ resource "aws_lb" "kong_nlb" {
   }
 }
 
-# Target Group for Kong Gateway NLB
+# NLB Target Group - Routes traffic from NLB to Kong Gateway containers (Port 8000 - Application Traffic)
 resource "aws_lb_target_group" "kong" {
   count       = var.kong_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-kong-tg"
+  name        = "${var.project_name}-${var.environment}-nlb-kong-traffic-tg"
   port        = 8000
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -614,11 +625,36 @@ resource "aws_lb_target_group" "kong" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-kong-tg"
+    Name = "${var.project_name}-${var.environment}-nlb-kong-traffic-tg"
   }
 }
 
-# NLB Listener for Kong Gateway
+# NLB Target Group - Routes health checks from NLB to Kong Gateway containers (Port 8100 - Status API)
+resource "aws_lb_target_group" "kong_health" {
+  count       = var.kong_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-nlb-kong-health-tg"
+  port        = 8100
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+    protocol            = "HTTP"
+    port                = "8100"
+    path                = "/status/ready"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-nlb-kong-health-tg"
+  }
+}
+
+# NLB Listener - Accepts traffic on port 8000 and forwards to Kong Gateway containers (Application Traffic)
 resource "aws_lb_listener" "kong_nlb" {
   count             = var.kong_enabled ? 1 : 0
   load_balancer_arn = aws_lb.kong_nlb[0].arn
@@ -628,6 +664,19 @@ resource "aws_lb_listener" "kong_nlb" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.kong[0].arn
+  }
+}
+
+# NLB Listener - Accepts health checks on port 8100 and forwards to Kong Gateway status API
+resource "aws_lb_listener" "kong_nlb_health" {
+  count             = var.kong_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.kong_nlb[0].arn
+  port              = "8100"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_health[0].arn
   }
 }
 
@@ -650,10 +699,18 @@ resource "aws_ecs_service" "kong_gateway" {
     assign_public_ip = false
   }
 
+  # Register Kong containers to NLB target group for application traffic (port 8000)
   load_balancer {
     target_group_arn = aws_lb_target_group.kong[0].arn
     container_name   = "${var.project_name}-${var.environment}-kong-container"
     container_port   = 8000
+  }
+
+  # Register Kong containers to NLB target group for health checks (port 8100)
+  load_balancer {
+    target_group_arn = aws_lb_target_group.kong_health[0].arn
+    container_name   = "${var.project_name}-${var.environment}-kong-container"
+    container_port   = 8100
   }
 
   # Register Kong Gateway service in Cloud Map for service discovery
@@ -662,7 +719,8 @@ resource "aws_ecs_service" "kong_gateway" {
   }
 
   depends_on = [
-    aws_lb_listener.kong_nlb
+    aws_lb_listener.kong_nlb,
+    aws_lb_listener.kong_nlb_health
   ]
 
   tags = {

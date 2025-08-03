@@ -74,6 +74,17 @@ output "kong_log_group_name" {
   value       = var.kong_enabled ? aws_cloudwatch_log_group.kong_app[0].name : null
 }
 
+# Kong Gateway NLB Target Group outputs  
+output "kong_nlb_target_group_arn" {
+  description = "ARN of the NLB target group for Kong Gateway application traffic (port 8000)"
+  value       = var.kong_enabled ? aws_lb_target_group.kong[0].arn : null
+}
+
+output "kong_nlb_health_target_group_arn" {
+  description = "ARN of the NLB target group for Kong Gateway health checks (port 8100)"
+  value       = var.kong_enabled ? aws_lb_target_group.kong_health[0].arn : null
+}
+
 # Kong Gateway secrets outputs
 output "kong_cluster_cert_secret_arn" {
   description = "ARN of the Kong Gateway cluster certificate secret"
