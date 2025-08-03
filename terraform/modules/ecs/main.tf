@@ -607,7 +607,7 @@ resource "aws_lb" "kong_nlb" {
 # NLB Target Group - Routes traffic from NLB to Kong Gateway containers (Port 8000 - Application Traffic)
 resource "aws_lb_target_group" "kong" {
   count       = var.kong_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-nlb-kong-traffic-tg"
+  name        = "${var.project_name}-${var.environment}-kong-traffic"
   port        = 8000
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -625,14 +625,14 @@ resource "aws_lb_target_group" "kong" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nlb-kong-traffic-tg"
+    Name = "${var.project_name}-${var.environment}-kong-traffic"
   }
 }
 
 # NLB Target Group - Routes health checks from NLB to Kong Gateway containers (Port 8100 - Status API)
 resource "aws_lb_target_group" "kong_health" {
   count       = var.kong_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-nlb-kong-health-tg"
+  name        = "${var.project_name}-${var.environment}-kong-health"
   port        = 8100
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -650,7 +650,7 @@ resource "aws_lb_target_group" "kong_health" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-nlb-kong-health-tg"
+    Name = "${var.project_name}-${var.environment}-kong-health"
   }
 }
 
