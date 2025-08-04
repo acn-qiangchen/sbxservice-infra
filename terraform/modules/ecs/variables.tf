@@ -101,4 +101,11 @@ variable "kong_app_count" {
   description = "Number of Kong Gateway containers to run"
   type        = number
   default     = 1
+}
+
+# Gloo Gateway variables
+variable "gloo_enabled" {
+  description = "Whether to enable Gloo Gateway service"
+  type        = bool
+  default     = false
 } 

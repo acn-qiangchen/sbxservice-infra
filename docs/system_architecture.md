@@ -2,113 +2,122 @@
 
 ## Overview
 
-This document outlines the high-level architecture of the SBXService microservice system on AWS.
+This document outlines the high-level architecture of the SBXService microservice system on AWS, featuring a dual-gateway setup with Kong Gateway and Gloo Gateway for enhanced traffic management and API governance.
 
-## Architecture Diagram
+## Current Architecture Diagram
+
+The system now implements a sophisticated dual-gateway architecture with header-based routing:
+
+## Dual Gateway Architecture
+
+### Gateway Routing Strategy
+
+The system uses **header-based routing** through the Application Load Balancer (ALB) to determine which gateway processes the request:
+
+- **`X-Gateway: kong`** → Routes to Kong Gateway (ECS Fargate)
+- **`X-Gateway: gloo`** → Routes to Gloo Gateway (EKS Fargate)  
+- **No header or other values** → Routes directly to Hello Service
+
+### Traffic Flow
 
 ```
-                                     ┌───────────────┐
-                                     │   Route 53    │
-                                     └───────┬───────┘
-                                             │
-                                     ┌───────▼───────┐
-                                     │  CloudFront   │
-                                     └───────┬───────┘
-                                             │
-┌────────────────────────────────────┐      │      ┌────────────────────────────────┐
-│            AWS WAF                 │◄─────┘      │        AWS Certificate Manager  │
-└──────────────┬─────────────────────┘             └────────────────────────────────┘
-               │                                                    ▲
-┌──────────────▼─────────────────────┐                             │
-│            API Gateway             │─────────────────────────────┘
-└──────────────┬─────────────────────┘
-               │                                    ┌────────────────────────────────┐
-┌──────────────┼─────────────────────┐             │                                │
-│   ┌──────────▼──────────┐          │             │       AWS Cognito              │
-│   │ User Service        │◄─────────┼─────────────┤                                │
-│   └─────────┬───────────┘          │             └────────────────────────────────┘
-│             │                      │
-│   ┌─────────▼───────────┐          │             ┌────────────────────────────────┐
-│   │ Auth Service        │◄─────────┼─────────────┤                                │
-│   └─────────┬───────────┘          │             │       AWS SNS                  │
-│             │                      │             │                                │
-│   ┌─────────▼───────────┐          │             └────────────────────────────────┘
-│   │ Data Service        │◄─────────┼─────────────┐          ▲
-│   └─────────┬───────────┘          │             │          │
-│             │                      │             │          │
-│   ┌─────────▼───────────┐          │             │          │
-│   │ Reporting Service   │──────────┼─────────────┘          │
-│   └─────────────────────┘          │                        │
-│                                    │                        │
-│            ECS/EKS Cluster         │                        │
-└────────────────────────────────────┘                        │
-               ▲                                              │
-               │                                              │
-┌──────────────┴─────────────────────┐             ┌──────────▼───────────────────────┐
-│                                    │             │                                   │
-│            Amazon RDS              │             │          AWS SQS                  │
-│                                    │             │                                   │
-└────────────────────────────────────┘             └───────────────────────────────────┘
-               ▲                                              ▲
-               │                                              │
-┌──────────────┴─────────────────────┐             ┌──────────▼───────────────────────┐
-│                                    │             │                                   │
-│            DynamoDB                │             │       AWS Lambda                  │
-│                                    │             │                                   │
-└────────────────────────────────────┘             └───────────────────────────────────┘
+Internet → Route 53 → CloudFront → WAF → ALB → {Header Routing} → Gateway → Hello Service
 ```
 
-*Note: This is a placeholder ASCII diagram. Replace with a proper architecture diagram using a tool like draw.io, Lucidchart, or AWS Architecture Diagrams.*
+### Infrastructure Components
+
+#### Kong Gateway (ECS-based)
+- **Purpose**: Enterprise-grade API gateway with Kong Connect integration
+- **Platform**: ECS Fargate containers
+- **Connectivity**: Kong NLB → Kong Gateway → Hello Service
+- **Features**: Enterprise policies, Kong Connect management, production-ready
+
+#### Gloo Gateway (EKS-based)  
+- **Purpose**: Kubernetes-native API gateway with advanced traffic management
+- **Platform**: EKS Fargate pods
+- **Connectivity**: Gloo NLB → Gloo Gateway → Hello Service
+- **Features**: GitOps integration, Kubernetes-native configs, cloud-native policies
+
+#### Shared Backend Service
+- **Hello Service**: Single ECS-based Spring Boot application
+- **Service Discovery**: AWS Cloud Map for DNS-based service resolution
+- **Connectivity**: Both gateways connect to the same backend via Cloud Map DNS
+
+### Load Balancer Architecture
+
+```
+ALB (Internet-facing)
+├── Kong Route (X-Gateway: kong) → Kong NLB (Internal) → Kong Gateway (ECS)
+├── Gloo Route (X-Gateway: gloo) → Gloo NLB (Internal) → Gloo Gateway (EKS)  
+└── Default Route (no header) → Hello Service (ECS)
+                                     ↑
+                                Both gateways → Hello Service
+```
 
 ## Service Components
 
-### User Management Service
-- Purpose: Manages user profiles, accounts, and preferences
-- AWS Resources: ECS/EKS, RDS, ElastiCache
-- Storage: PostgreSQL database for relational data
-- Scalability: Auto-scaling based on CPU/memory usage
+### Hello Service (Backend Application)
+- **Purpose**: Core business logic and API endpoints
+- **Platform**: ECS Fargate containers  
+- **Framework**: Spring Boot with health check endpoints
+- **Connectivity**: Accessible via both gateways and direct ALB routing
+- **Service Discovery**: Registered in AWS Cloud Map for DNS resolution
 
-### Authentication/Authorization Service
-- Purpose: Handles authentication, authorization, and token management
-- AWS Resources: Cognito, Lambda, DynamoDB
-- Integrations: OAuth providers, OIDC
-- Security: JWT tokens, refresh tokens, role-based access control
+### Kong Gateway Service
+- **Purpose**: Enterprise API gateway with advanced policy management
+- **Platform**: ECS Fargate containers
+- **Control Plane**: Kong Connect (SaaS) for centralized management
+- **Features**: Rate limiting, authentication, monitoring, enterprise policies
+- **Ports**: 8000 (proxy), 8100 (admin/status)
 
-### Data Processing Service
-- Purpose: Processes and transforms data
-- AWS Resources: ECS/EKS, SQS, Lambda, S3
-- Event Handling: Consumes events from SQS for async processing
-- Storage: S3 for object storage, DynamoDB for processed results
+### Gloo Gateway Service  
+- **Purpose**: Kubernetes-native API gateway with GitOps integration
+- **Platform**: EKS Fargate pods
+- **Control Plane**: Local Kubernetes control plane
+- **Features**: Gateway API compliance, advanced traffic splitting, observability
+- **Port**: 8080 (proxy)
 
-### Reporting/Analytics Service
-- Purpose: Generates reports and analytics
-- AWS Resources: ECS/EKS, RDS, Redshift (optional)
-- Data Flow: Consumes data from Data Service via events
-- Output: REST API for data retrieval, scheduled report generation
+### Gateway Management
+- **Shared Configuration**: Both gateways can be configured to apply similar policies
+- **Independent Scaling**: Each gateway scales independently based on traffic
+- **Failover Strategy**: Direct ALB routing provides fallback if gateways are unavailable
 
 ## Communication Patterns
 
-### Synchronous Communication
-- REST APIs via API Gateway
-- Service-to-service direct calls for critical path operations
+### Gateway-Based Routing
+- **Header-Based Selection**: Client specifies gateway via `X-Gateway` header
+- **Default Fallback**: Direct access to hello-service when no gateway specified
+- **Load Balancing**: Each gateway has its own NLB for high availability
 
-### Asynchronous Communication
-- Event-driven using SNS/SQS
-- Eventual consistency model for distributed operations
+### Service-to-Service Communication
+- **Service Discovery**: AWS Cloud Map provides DNS-based service resolution
+- **Network Isolation**: Private subnets with security group controls
+- **Health Checks**: Automated health monitoring for all components
 
-## Data Management
+### Traffic Management
+- **Kong Gateway**: Enterprise-grade traffic policies and rate limiting
+- **Gloo Gateway**: Advanced traffic splitting and canary deployments
+- **Direct Access**: Unmediated access for testing and fallback scenarios
 
-### Data Storage
-- Relational Data: Amazon RDS (PostgreSQL/MySQL)
-- NoSQL Data: DynamoDB
-- Object Storage: S3
-- Caching: ElastiCache (Redis)
+## Infrastructure Management
 
-### Data Flow
-1. API Gateway routes requests to appropriate services
-2. Services process requests and persist data as needed
-3. Event notifications trigger asynchronous processes
-4. Reporting service aggregates data for analytics
+### Container Orchestration
+- **ECS Fargate**: Serverless containers for Kong Gateway and Hello Service
+- **EKS Fargate**: Serverless Kubernetes for Gloo Gateway
+- **Auto Scaling**: Automatic scaling based on CPU/memory usage and request volume
+
+### Network Architecture
+- **VPC**: Isolated network environment with public and private subnets
+- **ALB**: Internet-facing load balancer with SSL termination
+- **NLBs**: Internal load balancers for each gateway (Kong and Gloo)
+- **Security Groups**: Fine-grained network access control
+
+### Service Discovery Flow
+1. ALB receives request and examines headers
+2. ALB routes to appropriate gateway or direct to service
+3. Gateways resolve backend service via Cloud Map DNS
+4. Request forwarded to Hello Service instances
+5. Response returned through the same path
 
 ## Deployment Strategy
 
@@ -157,12 +166,30 @@ This document outlines the high-level architecture of the SBXService microservic
 - Rate limiting
 - Request validation
 
+## Gateway Comparison
+
+| Feature | Kong Gateway | Gloo Gateway | Direct Access |
+|---------|-------------|--------------|---------------|
+| **Platform** | ECS Fargate | EKS Fargate | ECS Fargate |
+| **Management** | Kong Connect (SaaS) | Kubernetes-native | N/A |
+| **Configuration** | Enterprise UI + API | YAML + GitOps | N/A |
+| **Policies** | Enterprise features | OSS + Enterprise | Basic ALB features |
+| **Use Cases** | Production workloads | Cloud-native apps | Testing/Fallback |
+| **Header** | `X-Gateway: kong` | `X-Gateway: gloo` | None required |
+
 ## Future Enhancements
 
-- AI/ML integration for data insights
-- Real-time analytics dashboard
-- Mobile application backend support
-- Multi-region deployment for global availability
+### Gateway Features
+- **Multi-tenancy**: Separate gateway configurations per tenant
+- **Policy Harmonization**: Consistent policies across both gateways
+- **Advanced Observability**: Distributed tracing and metrics correlation
+- **A/B Testing**: Traffic splitting between gateways for feature testing
+
+### Infrastructure Improvements  
+- **Multi-region**: Deploy gateway infrastructure across multiple AWS regions
+- **Edge Computing**: CloudFront integration for global content delivery
+- **Security Hardening**: WAF rules, DDoS protection, and threat detection
+- **Cost Optimization**: Reserved capacity and spot instance utilization
 
 ---
 

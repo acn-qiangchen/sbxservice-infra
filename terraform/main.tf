@@ -148,6 +148,25 @@ module "ecs" {
   # Kong Gateway configuration
   kong_enabled   = var.kong_enabled
   kong_app_count = 1
+
+  # Gloo Gateway configuration
+  gloo_enabled = var.gloo_enabled
+}
+
+# EKS Fargate for Gloo Gateway
+module "eks" {
+  source = "./modules/eks"
+
+  project_name    = var.project_name
+  environment     = var.environment
+  region          = var.aws_region
+  vpc_id          = module.vpc.vpc_id
+  vpc_cidr        = var.vpc_cidr
+  private_subnets = module.vpc.private_subnets
+
+  # Gloo Gateway configuration
+  gloo_enabled       = var.gloo_enabled
+  kubernetes_version = "1.30"
 }
 
 # Route53 A record for ALB custom domain
@@ -257,4 +276,30 @@ output "hello_service_dns_name" {
 output "kong_service_dns_name" {
   description = "DNS name for Kong Gateway service discovery"
   value       = var.kong_enabled ? "kong-gateway.${module.ecs.service_discovery_namespace_name}" : null
+}
+
+# EKS and Gloo Gateway outputs
+output "eks_cluster_name" {
+  description = "Name of the EKS cluster for Gloo Gateway"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "Endpoint for the EKS cluster"
+  value       = module.eks.cluster_endpoint
+}
+
+output "gloo_nlb_dns_name" {
+  description = "DNS name of the Gloo Gateway Network Load Balancer"
+  value       = module.ecs.gloo_nlb_dns_name
+}
+
+output "gloo_nlb_target_group_arn" {
+  description = "ARN of the Gloo Gateway NLB target group"
+  value       = module.ecs.gloo_nlb_target_group_arn
+}
+
+output "gloo_enabled" {
+  description = "Whether Gloo Gateway is enabled"
+  value       = var.gloo_enabled
 } 

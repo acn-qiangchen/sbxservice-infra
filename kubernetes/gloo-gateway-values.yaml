@@ -1,0 +1,135 @@
+# Gloo Gateway Helm Values for EKS Fargate Deployment
+# This configuration is optimized for EKS Fargate with AWS Load Balancer integration
+
+# Global settings
+global:
+  image:
+    pullPolicy: IfNotPresent
+
+# Gloo control plane settings
+gloo:
+  deployment:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  # Disable leader election for single replica
+  disableLeaderElection: true
+
+# Discovery service settings
+discovery:
+  deployment:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+  # Use whitelist mode for better performance
+  fdsMode: WHITELIST
+
+# Gateway proxy settings
+gateway:
+  # Disable validation webhook for simplicity
+  validation:
+    enabled: false
+  
+  # Proxy deployment settings
+  proxyDeployment:
+    replicas: 2  # For high availability
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  
+  # Configure the proxy service as AWS NLB
+  proxyServiceType: LoadBalancer
+  proxyServiceAnnotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "deregistration_delay.timeout_seconds=30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval-seconds: "30"
+    service.beta.kubernetes.io/aws-load-balancer-healthy-threshold-count: "2"
+    service.beta.kubernetes.io/aws-load-balancer-unhealthy-threshold-count: "3"
+
+# Gateway configuration
+gatewayProxies:
+  gatewayProxy:
+    # Listen on port 8080 for HTTP traffic
+    service:
+      type: LoadBalancer
+      ports:
+        - port: 8080
+          targetPort: 8080
+          protocol: TCP
+          name: http
+    # Pod template settings for Fargate
+    podTemplate:
+      probes: true
+      image:
+        pullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+      # Security context for Fargate compatibility
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10101
+        fsGroup: 10101
+      # Node selection for Fargate
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+        - key: "eks.amazonaws.com/compute-type"
+          operator: "Equal"
+          value: "fargate"
+          effect: "NoSchedule"
+    # Gateway configuration
+    gatewaySettings:
+      useProxyProto: false
+      customHttpGateway:
+        virtualServiceSelector:
+          gloo: "gateway-proxy"
+
+# Settings for EKS Fargate
+settings:
+  # Create settings configmap
+  create: true
+  # Disable usage statistics
+  disableUsageStatistics: true
+  # Watchdog settings for Fargate
+  watchdog:
+    enabled: false
+
+# Ingress controller (disabled, using Gateway API)
+ingress:
+  enabled: false
+
+# AccessLogger (optional)
+accessLogger:
+  enabled: false
+
+# Rate limiting (disabled for basic setup)
+rateLimiter:
+  enabled: false
+
+# External auth (disabled for basic setup)
+extauth:
+  enabled: false

@@ -115,4 +115,25 @@ output "hello_service_discovery_arn" {
 output "kong_service_discovery_arn" {
   description = "ARN of the Kong Gateway service discovery service"
   value       = var.kong_enabled ? aws_service_discovery_service.kong_gateway[0].arn : null
+}
+
+# Gloo Gateway outputs
+output "gloo_nlb_arn" {
+  description = "ARN of the Gloo Gateway Network Load Balancer"
+  value       = var.gloo_enabled ? aws_lb.gloo_nlb[0].arn : null
+}
+
+output "gloo_nlb_dns_name" {
+  description = "DNS name of the Gloo Gateway Network Load Balancer"
+  value       = var.gloo_enabled ? aws_lb.gloo_nlb[0].dns_name : null
+}
+
+output "gloo_nlb_zone_id" {
+  description = "Zone ID of the Gloo Gateway Network Load Balancer"
+  value       = var.gloo_enabled ? aws_lb.gloo_nlb[0].zone_id : null
+}
+
+output "gloo_nlb_target_group_arn" {
+  description = "ARN of the NLB target group for Gloo Gateway application traffic (port 8080)"
+  value       = var.gloo_enabled ? aws_lb_target_group.gloo[0].arn : null
 } 

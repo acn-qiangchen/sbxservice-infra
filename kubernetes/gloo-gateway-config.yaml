@@ -1,0 +1,110 @@
+# Gloo Gateway Configuration for Hello Service Integration
+# This configuration sets up Gloo Gateway to route traffic to the hello-service 
+# running on ECS via Cloud Map service discovery
+
+apiVersion: gloo.solo.io/v1
+kind: Upstream
+metadata:
+  name: hello-service-upstream
+  namespace: gloo-system
+spec:
+  # Use static upstream pointing to the ECS service via Cloud Map DNS
+  static:
+    hosts:
+      - addr: sbxservice.sbxservice.local  # This should match the Cloud Map service DNS name
+        port: 8080
+  # Health check configuration
+  healthChecks:
+    - path: /actuator/health
+      method: GET
+      interval: 30s
+      timeout: 5s
+      unhealthyThreshold: 3
+      healthyThreshold: 2
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gloo-gateway
+  namespace: gloo-system
+spec:
+  gatewayClassName: gloo-gateway
+  listeners:
+    - name: http
+      port: 8080
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hello-service-route
+  namespace: gloo-system
+spec:
+  parentRefs:
+    - name: gloo-gateway
+      namespace: gloo-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: hello-service-upstream
+          port: 8080
+          namespace: gloo-system
+
+---
+# Virtual Service for legacy Gloo v1 API (if needed)
+apiVersion: gateway.solo.io/v1
+kind: VirtualService
+metadata:
+  name: hello-service-vs
+  namespace: gloo-system
+spec:
+  virtualHost:
+    domains:
+      - '*'
+    routes:
+      - matchers:
+          - prefix: /
+        routeAction:
+          single:
+            upstream:
+              name: hello-service-upstream
+              namespace: gloo-system
+        options:
+          timeout: 30s
+          retryPolicy:
+            retryOn: 5xx
+            numRetries: 3
+            perTryTimeout: 10s
+
+---
+# Service to expose Gloo Gateway proxy with LoadBalancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-proxy-nlb
+  namespace: gloo-system
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "deregistration_delay.timeout_seconds=30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+spec:
+  selector:
+    gloo: gateway-proxy
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: LoadBalancer

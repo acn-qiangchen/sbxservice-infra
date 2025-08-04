@@ -61,6 +61,13 @@ variable "kong_enabled" {
   default     = true
 }
 
+# Gloo Gateway configuration
+variable "gloo_enabled" {
+  description = "Whether to enable Gloo Gateway EKS cluster"
+  type        = bool
+  default     = false
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string

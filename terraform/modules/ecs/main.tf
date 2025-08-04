@@ -470,17 +470,18 @@ resource "aws_lb" "main" {
   }
 }
 
-# ALB Target Group - Routes traffic from ALB to NLB (when Kong enabled) or Hello-Service (when Kong disabled)
-resource "aws_lb_target_group" "app" {
-  name        = "${var.project_name}-${var.environment}-alb-tg"
-  port        = var.kong_enabled ? 8000 : var.container_port
+# ALB Target Group - Routes traffic from ALB to Kong NLB (when Kong enabled)
+resource "aws_lb_target_group" "kong_alb" {
+  count       = var.kong_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-alb-tg"
+  port        = 8000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
-    path                = var.kong_enabled ? "/status/ready" : "/actuator/health"
-    port                = var.kong_enabled ? "8100" : "traffic-port"
+    path                = "/status/ready"
+    port                = "8100"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 3
@@ -489,7 +490,54 @@ resource "aws_lb_target_group" "app" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-alb-tg"
+    Name = "${var.project_name}-${var.environment}-kong-alb-tg"
+  }
+}
+
+# ALB Target Group - Routes traffic from ALB to Gloo NLB (when Gloo enabled)
+resource "aws_lb_target_group" "gloo_alb" {
+  count       = var.gloo_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-gloo-alb-tg"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    port                = "traffic-port"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-gloo-alb-tg"
+  }
+}
+
+# ALB Target Group - Routes traffic from ALB directly to Hello-Service (fallback when no gateways enabled)
+resource "aws_lb_target_group" "app" {
+  name        = "${var.project_name}-${var.environment}-app-alb-tg"
+  port        = var.container_port
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/actuator/health"
+    port                = "traffic-port"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-app-alb-tg"
   }
 }
 
@@ -508,14 +556,39 @@ data "aws_network_interface" "kong_nlb_eni" {
   }
 }
 
-# ALB to NLB Connection - Attaches Kong NLB IPs to ALB target group (connects ALB → NLB → Kong)
+# Data source to get Gloo NLB private IP addresses for connecting ALB to NLB
+data "aws_network_interface" "gloo_nlb_eni" {
+  count = var.gloo_enabled ? length(var.private_subnets) : 0
+
+  filter {
+    name   = "description"
+    values = ["ELB ${aws_lb.gloo_nlb[0].arn_suffix}"]
+  }
+
+  filter {
+    name   = "subnet-id"
+    values = [var.private_subnets[count.index]]
+  }
+}
+
+# ALB to Kong NLB Connection - Attaches Kong NLB IPs to Kong ALB target group
 resource "aws_lb_target_group_attachment" "kong_nlb" {
   count            = var.kong_enabled ? length(var.private_subnets) : 0
-  target_group_arn = aws_lb_target_group.app.arn
+  target_group_arn = aws_lb_target_group.kong_alb[0].arn
   target_id        = data.aws_network_interface.kong_nlb_eni[count.index].private_ip
-  port             = 8100
+  port             = 8000
 
-  depends_on = [aws_lb.kong_nlb, aws_lb_listener.kong_nlb_health]
+  depends_on = [aws_lb.kong_nlb, aws_lb_listener.kong_nlb]
+}
+
+# ALB to Gloo NLB Connection - Attaches Gloo NLB IPs to Gloo ALB target group
+resource "aws_lb_target_group_attachment" "gloo_nlb" {
+  count            = var.gloo_enabled ? length(var.private_subnets) : 0
+  target_group_arn = aws_lb_target_group.gloo_alb[0].arn
+  target_id        = data.aws_network_interface.gloo_nlb_eni[count.index].private_ip
+  port             = 8080
+
+  depends_on = [aws_lb.gloo_nlb, aws_lb_listener.gloo_nlb]
 }
 
 # ALB Listener for HTTPS (when certificate is provided)
@@ -527,9 +600,48 @@ resource "aws_lb_listener" "https" {
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   certificate_arn   = var.acm_certificate_arn
 
+  # Default action - route to hello-service directly
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+# ALB Listener Rule for HTTPS - Route to Kong Gateway when X-Gateway: kong header is present
+resource "aws_lb_listener_rule" "https_kong" {
+  count        = var.enable_https && var.kong_enabled ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_alb[0].arn
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Gateway"
+      values          = ["kong"]
+    }
+  }
+}
+
+# ALB Listener Rule for HTTPS - Route to Gloo Gateway when X-Gateway: gloo header is present
+resource "aws_lb_listener_rule" "https_gloo" {
+  count        = var.enable_https && var.gloo_enabled ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 200
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.gloo_alb[0].arn
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Gateway"
+      values          = ["gloo"]
+    }
   }
 }
 
@@ -539,9 +651,48 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  # Default action - route to hello-service directly
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+# ALB Listener Rule for HTTP - Route to Kong Gateway when X-Gateway: kong header is present
+resource "aws_lb_listener_rule" "http_kong" {
+  count        = var.kong_enabled ? 1 : 0
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_alb[0].arn
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Gateway"
+      values          = ["kong"]
+    }
+  }
+}
+
+# ALB Listener Rule for HTTP - Route to Gloo Gateway when X-Gateway: gloo header is present
+resource "aws_lb_listener_rule" "http_gloo" {
+  count        = var.gloo_enabled ? 1 : 0
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 200
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.gloo_alb[0].arn
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Gateway"
+      values          = ["gloo"]
+    }
   }
 }
 
@@ -563,14 +714,11 @@ resource "aws_ecs_service" "app" {
     assign_public_ip = false
   }
 
-  # Only attach to ALB if Kong is not enabled
-  dynamic "load_balancer" {
-    for_each = var.kong_enabled ? [] : [1]
-    content {
-      target_group_arn = aws_lb_target_group.app.arn
-      container_name   = "${var.project_name}-${var.environment}-container"
-      container_port   = var.container_port
-    }
+  # Always attach to ALB app target group (for fallback routing and direct access)
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "${var.project_name}-${var.environment}-container"
+    container_port   = var.container_port
   }
 
   # Register service in Cloud Map for service discovery
@@ -725,5 +873,67 @@ resource "aws_ecs_service" "kong_gateway" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-kong-service"
+  }
+}
+
+# ============================================================================
+# GLOO GATEWAY NETWORK LOAD BALANCER
+# 
+# Creates NLB infrastructure for Gloo Gateway running on EKS Fargate.
+# Unlike Kong which runs on ECS, Gloo Gateway runs on EKS and targets will be
+# managed through Kubernetes LoadBalancer services.
+# ============================================================================
+
+# Network Load Balancer for Gloo Gateway
+resource "aws_lb" "gloo_nlb" {
+  count              = var.gloo_enabled ? 1 : 0
+  name               = "${var.project_name}-${var.environment}-gloo-nlb"
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = var.private_subnets
+
+  enable_deletion_protection       = false
+  enable_cross_zone_load_balancing = true
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-gloo-nlb"
+  }
+}
+
+# NLB Target Group - Routes traffic from NLB to Gloo Gateway pods (Port 8080 - Application Traffic)
+resource "aws_lb_target_group" "gloo" {
+  count       = var.gloo_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-gloo-traffic"
+  port        = 8080
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+    protocol            = "HTTP"
+    port                = "8080"
+    path                = "/health"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-gloo-traffic"
+  }
+}
+
+# NLB Listener - Accepts traffic on port 8080 and forwards to Gloo Gateway pods (Application Traffic)
+resource "aws_lb_listener" "gloo_nlb" {
+  count             = var.gloo_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.gloo_nlb[0].arn
+  port              = "8080"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.gloo[0].arn
   }
 } 
