@@ -28,7 +28,4 @@ variable "private_subnet_cidrs" {
   type        = list(string)
 }
 
-variable "firewall_subnet_cidrs" {
-  description = "List of CIDR blocks for firewall subnets"
-  type        = list(string)
-} 
+ 

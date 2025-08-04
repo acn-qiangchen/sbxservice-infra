@@ -38,7 +38,7 @@ resource "aws_appmesh_virtual_node" "service" {
     service_discovery {
       aws_cloud_map {
         service_name   = var.project_name
-        namespace_name = aws_service_discovery_private_dns_namespace.service_discovery.name
+        namespace_name = "${var.project_name}.${var.environment}.local"
       }
     }
   }
@@ -95,7 +95,7 @@ resource "aws_appmesh_route" "service_route" {
 
 # App Mesh Virtual Service to tie everything together
 resource "aws_appmesh_virtual_service" "service" {
-  name      = "${var.project_name}.${aws_service_discovery_private_dns_namespace.service_discovery.name}"
+  name      = "${var.project_name}.${var.project_name}.${var.environment}.local"
   mesh_name = aws_appmesh_mesh.service_mesh.id
 
   spec {
@@ -108,40 +108,5 @@ resource "aws_appmesh_virtual_service" "service" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-virtual-service"
-  }
-}
-
-# AWS Cloud Map Private DNS Namespace for service discovery
-resource "aws_service_discovery_private_dns_namespace" "service_discovery" {
-  name        = "${var.project_name}.${var.environment}.local"
-  description = "Service discovery namespace for ${var.project_name} in ${var.environment}"
-  vpc         = var.vpc_id
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-dns-namespace"
-  }
-}
-
-# AWS Cloud Map Service for service discovery
-resource "aws_service_discovery_service" "service" {
-  name = var.project_name
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.service_discovery.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-discovery-service"
   }
 } 

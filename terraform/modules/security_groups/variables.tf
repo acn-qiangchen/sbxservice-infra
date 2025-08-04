@@ -13,8 +13,4 @@ variable "vpc_cidr" {
   type        = string
 }
 
-variable "firewall_subnets" {
-  description = "List of firewall subnet IDs"
-  type        = list(string)
-  default     = []
-} 
+ 

@@ -86,27 +86,19 @@ variable "enable_https" {
   default     = false
 }
 
-# App Mesh variables
-variable "service_mesh_enabled" {
-  description = "Whether to enable App Mesh integration"
+
+
+# Kong Gateway variables
+variable "kong_enabled" {
+  description = "Whether to enable Kong Gateway service"
   type        = bool
-  default     = false
+  default     = true
 }
 
-variable "mesh_name" {
-  description = "Name of the App Mesh service mesh"
-  type        = string
-  default     = ""
-}
 
-variable "virtual_node_name" {
-  description = "Name of the App Mesh virtual node"
-  type        = string
-  default     = ""
-}
 
-variable "service_discovery_arn" {
-  description = "ARN of the service discovery service"
-  type        = string
-  default     = ""
+variable "kong_app_count" {
+  description = "Number of Kong Gateway containers to run"
+  type        = number
+  default     = 1
 } 
