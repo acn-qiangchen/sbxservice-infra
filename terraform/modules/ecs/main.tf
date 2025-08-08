@@ -513,7 +513,7 @@ resource "aws_lb_target_group_attachment" "kong_nlb" {
   count            = var.kong_enabled ? length(var.private_subnets) : 0
   target_group_arn = aws_lb_target_group.app.arn
   target_id        = data.aws_network_interface.kong_nlb_eni[count.index].private_ip
-  port             = 8100
+  port             = 8000
 
   depends_on = [aws_lb.kong_nlb, aws_lb_listener.kong_nlb_health]
 }
