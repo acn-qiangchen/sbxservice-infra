@@ -148,6 +148,11 @@ module "ecs" {
   # Kong Gateway configuration
   kong_enabled   = var.kong_enabled
   kong_app_count = 1
+
+  # Direct routing configuration
+  direct_routing_enabled = var.direct_routing_enabled
+  kong_traffic_weight    = var.kong_traffic_weight
+  direct_traffic_weight  = var.direct_traffic_weight
 }
 
 # Route53 A record for ALB custom domain
@@ -241,6 +246,25 @@ output "kong_service_name" {
 output "kong_enabled" {
   description = "Whether Kong Gateway is enabled"
   value       = var.kong_enabled
+}
+
+# Direct routing outputs
+output "direct_routing_enabled" {
+  description = "Whether direct routing is enabled"
+  value       = var.direct_routing_enabled
+}
+
+output "direct_nlb_dns_name" {
+  description = "DNS name of the Direct Network Load Balancer"
+  value       = module.ecs.direct_nlb_dns_name
+}
+
+output "traffic_routing_weights" {
+  description = "Current traffic routing weights"
+  value = {
+    kong_weight   = var.kong_traffic_weight
+    direct_weight = var.direct_traffic_weight
+  }
 }
 
 # Service Discovery outputs

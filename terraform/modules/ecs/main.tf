@@ -508,7 +508,7 @@ data "aws_network_interface" "kong_nlb_eni" {
   }
 }
 
-# ALB to NLB Connection - Attaches Kong NLB IPs to ALB target group (connects ALB → NLB → Kong)
+# ALB to Kong NLB Connection - Attaches Kong NLB IPs to ALB target group (connects ALB → NLB_1 → Kong)
 resource "aws_lb_target_group_attachment" "kong_nlb" {
   count            = var.kong_enabled ? length(var.private_subnets) : 0
   target_group_arn = aws_lb_target_group.app.arn
@@ -516,6 +516,31 @@ resource "aws_lb_target_group_attachment" "kong_nlb" {
   port             = 8000
 
   depends_on = [aws_lb.kong_nlb, aws_lb_listener.kong_nlb_health]
+}
+
+# Data source to get Direct NLB private IP addresses for connecting ALB to NLB_2
+data "aws_network_interface" "direct_nlb_eni" {
+  count = var.direct_routing_enabled ? length(var.private_subnets) : 0
+
+  filter {
+    name   = "description"
+    values = ["ELB ${aws_lb.direct_nlb[0].arn_suffix}"]
+  }
+
+  filter {
+    name   = "subnet-id"
+    values = [var.private_subnets[count.index]]
+  }
+}
+
+# ALB to Direct NLB Connection - Attaches Direct NLB IPs to ALB target group (connects ALB → NLB_2 → Hello-Service)
+resource "aws_lb_target_group_attachment" "direct_nlb" {
+  count            = var.direct_routing_enabled ? length(var.private_subnets) : 0
+  target_group_arn = aws_lb_target_group.app.arn
+  target_id        = data.aws_network_interface.direct_nlb_eni[count.index].private_ip
+  port             = 8000
+
+  depends_on = [aws_lb.direct_nlb, aws_lb_listener.direct_nlb]
 }
 
 # ALB Listener for HTTPS (when certificate is provided)
@@ -573,6 +598,16 @@ resource "aws_ecs_service" "app" {
     }
   }
 
+  # Register Hello-Service to direct NLB target group (when direct routing is enabled)
+  dynamic "load_balancer" {
+    for_each = var.direct_routing_enabled ? [1] : []
+    content {
+      target_group_arn = aws_lb_target_group.direct[0].arn
+      container_name   = "${var.project_name}-${var.environment}-container"
+      container_port   = var.container_port
+    }
+  }
+
   # Register service in Cloud Map for service discovery
   service_registries {
     registry_arn = aws_service_discovery_service.hello_service.arn
@@ -580,7 +615,8 @@ resource "aws_ecs_service" "app" {
 
   depends_on = [
     aws_lb_listener.http,
-    aws_lb_listener.https
+    aws_lb_listener.https,
+    aws_lb_listener.direct_nlb
   ]
 
   tags = {
@@ -588,7 +624,7 @@ resource "aws_ecs_service" "app" {
   }
 }
 
-# Network Load Balancer for Kong Gateway
+# Network Load Balancer for Kong Gateway (NLB_1)
 resource "aws_lb" "kong_nlb" {
   count              = var.kong_enabled ? 1 : 0
   name               = "${var.project_name}-${var.environment}-kong-nlb"
@@ -601,6 +637,22 @@ resource "aws_lb" "kong_nlb" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-kong-nlb"
+  }
+}
+
+# Network Load Balancer for Direct Hello-Service Access (NLB_2)
+resource "aws_lb" "direct_nlb" {
+  count              = var.direct_routing_enabled ? 1 : 0
+  name               = "${var.project_name}-${var.environment}-direct-nlb"
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = var.private_subnets
+
+  enable_deletion_protection       = false
+  enable_cross_zone_load_balancing = true
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-direct-nlb"
   }
 }
 
@@ -654,6 +706,31 @@ resource "aws_lb_target_group" "kong_health" {
   }
 }
 
+# Direct NLB Target Group - Routes traffic directly to Hello-Service (Port 8080 - Application Traffic)
+resource "aws_lb_target_group" "direct" {
+  count       = var.direct_routing_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-direct-traffic"
+  port        = 8080
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+    protocol            = "HTTP"
+    port                = "8080"
+    path                = "/actuator/health"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-direct-traffic"
+  }
+}
+
 # NLB Listener - Accepts traffic on port 8000 and forwards to Kong Gateway containers (Application Traffic)
 resource "aws_lb_listener" "kong_nlb" {
   count             = var.kong_enabled ? 1 : 0
@@ -677,6 +754,19 @@ resource "aws_lb_listener" "kong_nlb_health" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.kong_health[0].arn
+  }
+}
+
+# Direct NLB Listener - Accepts traffic on port 8000 and forwards directly to Hello-Service (Application Traffic)
+resource "aws_lb_listener" "direct_nlb" {
+  count             = var.direct_routing_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.direct_nlb[0].arn
+  port              = "8000"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.direct[0].arn
   }
 }
 

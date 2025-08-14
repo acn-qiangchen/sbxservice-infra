@@ -85,6 +85,22 @@ output "kong_nlb_health_target_group_arn" {
   value       = var.kong_enabled ? aws_lb_target_group.kong_health[0].arn : null
 }
 
+# Direct NLB outputs
+output "direct_nlb_arn" {
+  description = "ARN of the Direct Network Load Balancer"
+  value       = var.direct_routing_enabled ? aws_lb.direct_nlb[0].arn : null
+}
+
+output "direct_nlb_dns_name" {
+  description = "DNS name of the Direct Network Load Balancer"
+  value       = var.direct_routing_enabled ? aws_lb.direct_nlb[0].dns_name : null
+}
+
+output "direct_nlb_target_group_arn" {
+  description = "ARN of the Direct NLB target group for Hello-Service traffic (port 8080)"
+  value       = var.direct_routing_enabled ? aws_lb_target_group.direct[0].arn : null
+}
+
 # Kong Gateway secrets outputs
 output "kong_cluster_cert_secret_arn" {
   description = "ARN of the Kong Gateway cluster certificate secret"
