@@ -180,7 +180,7 @@ When building Docker images, always set the `platform` flag to the appropriate v
 ```bash
 docker buildx build --platform linux/amd64 -t your-service .
 ```
-
+.
 If you encounter an error like:
 ```
 CannotPullContainerError: pull image manifest has been retried 5 time(s): image Manifest does not contain descriptor matching platform 'linux/amd64'
