@@ -64,13 +64,13 @@ resource "aws_db_instance" "kong" {
   monitoring_role_arn             = aws_iam_role.rds_monitoring.arn
 
   # Performance Insights
-  performance_insights_enabled    = true
-  performance_insights_kms_key_id = var.kms_key_id != "" ? var.kms_key_id : null
+  performance_insights_enabled          = true
+  performance_insights_kms_key_id       = var.kms_key_id != "" ? var.kms_key_id : null
   performance_insights_retention_period = 7
 
   # Deletion protection
-  deletion_protection = var.deletion_protection
-  skip_final_snapshot = var.skip_final_snapshot
+  deletion_protection       = var.deletion_protection
+  skip_final_snapshot       = var.skip_final_snapshot
   final_snapshot_identifier = var.skip_final_snapshot ? null : "${var.project_name}-${var.environment}-kong-db-final-snapshot-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
 
   # Auto minor version upgrade

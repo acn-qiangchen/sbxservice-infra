@@ -130,14 +130,14 @@ module "rds" {
   private_subnets = module.vpc.private_subnets
   database_sg_id  = module.security_groups.database_sg_id
 
-  db_name               = var.kong_db_name
-  db_username           = var.kong_db_user
-  db_password           = var.kong_db_password
-  db_instance_class     = var.kong_db_instance_class
-  db_allocated_storage  = var.kong_db_allocated_storage
-  multi_az              = var.kong_db_multi_az
-  deletion_protection   = var.kong_db_deletion_protection
-  skip_final_snapshot   = var.kong_db_skip_final_snapshot
+  db_name              = var.kong_db_name
+  db_username          = var.kong_db_user
+  db_password          = var.kong_db_password
+  db_instance_class    = var.kong_db_instance_class
+  db_allocated_storage = var.kong_db_allocated_storage
+  multi_az             = var.kong_db_multi_az
+  deletion_protection  = var.kong_db_deletion_protection
+  skip_final_snapshot  = var.kong_db_skip_final_snapshot
 }
 
 
