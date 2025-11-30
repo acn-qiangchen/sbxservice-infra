@@ -34,7 +34,7 @@ resource "aws_db_parameter_group" "kong" {
 resource "aws_db_instance" "kong" {
   identifier     = "${var.project_name}-${var.environment}-kong-db"
   engine         = "postgres"
-  engine_version = "13.13"
+  engine_version = "13"  # Use major version, AWS will use latest minor version
   instance_class = var.db_instance_class
 
   allocated_storage     = var.db_allocated_storage
