@@ -126,7 +126,35 @@ resource "aws_iam_role_policy_attachment" "task_ecs_exec" {
   policy_arn = aws_iam_policy.ecs_exec_policy.arn
 }
 
-# Note: Kong secrets policy removed - no longer using Konnect certificates
+# IAM policy for Kong cluster certificates access
+resource "aws_iam_policy" "kong_secrets_policy" {
+  count       = var.kong_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-secrets-policy"
+  description = "Allow ECS tasks to read Kong cluster certificates"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.kong_cluster_cert[0].arn,
+          aws_secretsmanager_secret.kong_cluster_key[0].arn
+        ]
+      }
+    ]
+  })
+}
+
+# Attach Kong secrets policy to execution role
+resource "aws_iam_role_policy_attachment" "execution_kong_secrets" {
+  count      = var.kong_enabled ? 1 : 0
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = aws_iam_policy.kong_secrets_policy[0].arn
+}
 
 # Create a policy for database secrets access (for PostgreSQL)
 resource "aws_iam_policy" "db_secrets_policy" {
@@ -555,12 +583,24 @@ resource "aws_ecs_task_definition" "kong_cp" {
         {
           name  = "KONG_ADMIN_ERROR_LOG"
           value = "/dev/stderr"
+        },
+        {
+          name  = "KONG_CLUSTER_MTLS"
+          value = "shared"
         }
       ]
       secrets = [
         {
           name      = "KONG_PG_PASSWORD"
           valueFrom = aws_secretsmanager_secret.kong_db_password[0].arn
+        },
+        {
+          name      = "KONG_CLUSTER_CERT"
+          valueFrom = aws_secretsmanager_secret.kong_cluster_cert[0].arn
+        },
+        {
+          name      = "KONG_CLUSTER_CERT_KEY"
+          valueFrom = aws_secretsmanager_secret.kong_cluster_key[0].arn
         }
       ]
       command = ["sh", "-c", "kong migrations bootstrap && kong migrations up && kong start"]
@@ -692,7 +732,65 @@ resource "aws_ecs_service" "kong_cp" {
   }
 }
 
-# Note: Konnect certificates removed - using self-hosted control plane instead
+# Generate self-signed certificates for Kong hybrid mode
+resource "tls_private_key" "kong_cluster" {
+  count     = var.kong_enabled ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "kong_cluster" {
+  count           = var.kong_enabled ? 1 : 0
+  private_key_pem = tls_private_key.kong_cluster[0].private_key_pem
+
+  subject {
+    common_name  = "kong-cluster"
+    organization = var.project_name
+  }
+
+  validity_period_hours = 87600 # 10 years
+
+  allowed_uses = [
+    "key_encipherment",
+    "digital_signature",
+    "server_auth",
+    "client_auth",
+  ]
+}
+
+# Store Kong cluster certificate in Secrets Manager
+resource "aws_secretsmanager_secret" "kong_cluster_cert" {
+  count       = var.kong_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-cluster-cert"
+  description = "Kong cluster certificate for hybrid mode"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-cluster-cert"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "kong_cluster_cert" {
+  count         = var.kong_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.kong_cluster_cert[0].id
+  secret_string = tls_self_signed_cert.kong_cluster[0].cert_pem
+}
+
+# Store Kong cluster private key in Secrets Manager
+resource "aws_secretsmanager_secret" "kong_cluster_key" {
+  count       = var.kong_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-cluster-key"
+  description = "Kong cluster private key for hybrid mode"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-cluster-key"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "kong_cluster_key" {
+  count         = var.kong_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.kong_cluster_key[0].id
+  secret_string = tls_private_key.kong_cluster[0].private_key_pem
+}
 
 # Kong Gateway Data Plane ECS Task Definition
 resource "aws_ecs_task_definition" "kong_gateway" {
@@ -780,6 +878,16 @@ resource "aws_ecs_task_definition" "kong_gateway" {
         {
           name  = "KONG_PROXY_ERROR_LOG"
           value = "/dev/stderr"
+        }
+      ]
+      secrets = [
+        {
+          name      = "KONG_CLUSTER_CERT"
+          valueFrom = aws_secretsmanager_secret.kong_cluster_cert[0].arn
+        },
+        {
+          name      = "KONG_CLUSTER_CERT_KEY"
+          valueFrom = aws_secretsmanager_secret.kong_cluster_key[0].arn
         }
       ]
     }
