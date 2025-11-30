@@ -458,7 +458,7 @@ resource "aws_ecs_task_definition" "kong_cp" {
   container_definitions = jsonencode([
     {
       name      = "${var.project_name}-${var.environment}-kong-cp-container"
-      image     = "kong:3.8-alpine"
+      image     = "kong:3.9.1"
       cpu       = 1024
       memory    = 2048
       essential = true
@@ -708,7 +708,7 @@ resource "aws_ecs_task_definition" "kong_gateway" {
   container_definitions = jsonencode([
     {
       name      = "${var.project_name}-${var.environment}-kong-container"
-      image     = "kong:3.8-alpine"
+      image     = "kong:3.9.1"
       cpu       = var.task_cpu
       memory    = var.task_memory
       essential = true
