@@ -328,9 +328,10 @@ resource "aws_cloudwatch_log_group" "postgres" {
 
 # AWS Secrets Manager secret for Kong database password
 resource "aws_secretsmanager_secret" "kong_db_password" {
-  count       = var.kong_db_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-kong-db-password"
-  description = "Kong database password"
+  count                   = var.kong_db_enabled ? 1 : 0
+  name                    = "${var.project_name}-${var.environment}-kong-db-password"
+  description             = "Kong database password"
+  recovery_window_in_days = 0 # Force immediate deletion
 
   tags = {
     Name = "${var.project_name}-${var.environment}-kong-db-password"
