@@ -124,20 +124,20 @@ output "kong_service_discovery_arn" {
   value       = var.kong_enabled ? aws_service_discovery_service.kong_gateway[0].arn : null
 }
 
-# PostgreSQL Database outputs
+# PostgreSQL Database outputs (only for ECS PostgreSQL, not RDS)
 output "postgres_service_name" {
   description = "Name of the PostgreSQL ECS service"
-  value       = var.kong_db_enabled ? aws_ecs_service.postgres[0].name : null
+  value       = var.kong_db_enabled && !var.kong_db_use_rds ? aws_ecs_service.postgres[0].name : null
 }
 
 output "postgres_service_discovery_arn" {
   description = "ARN of the PostgreSQL service discovery service"
-  value       = var.kong_db_enabled ? aws_service_discovery_service.postgres[0].arn : null
+  value       = var.kong_db_enabled && !var.kong_db_use_rds ? aws_service_discovery_service.postgres[0].arn : null
 }
 
 output "postgres_dns_name" {
   description = "DNS name for PostgreSQL service discovery"
-  value       = var.kong_db_enabled ? "postgres.${aws_service_discovery_private_dns_namespace.service_discovery.name}" : null
+  value       = var.kong_db_enabled && !var.kong_db_use_rds ? "postgres.${aws_service_discovery_private_dns_namespace.service_discovery.name}" : null
 }
 
 output "kong_db_password_secret_arn" {
