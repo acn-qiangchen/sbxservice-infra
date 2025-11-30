@@ -112,15 +112,8 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
-# CloudWatch Log Group for PostgreSQL logs
-resource "aws_cloudwatch_log_group" "postgresql" {
-  name              = "/aws/rds/instance/${aws_db_instance.kong.identifier}/postgresql"
-  retention_in_days = 30
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-kong-db-postgresql-logs"
-  }
-}
+# Note: CloudWatch Log Groups for RDS are created automatically by RDS
+# when enabled_cloudwatch_logs_exports is set. No need to create them explicitly.
 
 # CloudWatch Alarms
 resource "aws_cloudwatch_metric_alarm" "database_cpu" {
