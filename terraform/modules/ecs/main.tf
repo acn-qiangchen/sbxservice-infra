@@ -654,10 +654,10 @@ resource "aws_lb" "kong_admin_nlb" {
   }
 }
 
-# NLB Target Group for Kong Admin API (port 8001)
-resource "aws_lb_target_group" "kong_admin" {
+# NLB Target Group for Kong Admin API (port 8001) - Internal access
+resource "aws_lb_target_group" "kong_admin_nlb" {
   count       = var.kong_control_plane_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-kong-admin"
+  name        = "${var.project_name}-${var.environment}-kong-admin-nlb"
   port        = 8001
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -675,7 +675,7 @@ resource "aws_lb_target_group" "kong_admin" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-kong-admin"
+    Name = "${var.project_name}-${var.environment}-kong-admin-nlb"
   }
 }
 
@@ -688,7 +688,7 @@ resource "aws_lb_listener" "kong_admin_nlb" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.kong_admin[0].arn
+    target_group_arn = aws_lb_target_group.kong_admin_nlb[0].arn
   }
 }
 
@@ -711,7 +711,14 @@ resource "aws_ecs_service" "kong_cp" {
     assign_public_ip = false
   }
 
-  # Register Kong Admin API to NLB target group
+  # Register Kong Admin API to internal NLB target group
+  load_balancer {
+    target_group_arn = aws_lb_target_group.kong_admin_nlb[0].arn
+    container_name   = "${var.project_name}-${var.environment}-kong-cp-container"
+    container_port   = 8001
+  }
+
+  # Register Kong Admin API to ALB target group (for demo access)
   load_balancer {
     target_group_arn = aws_lb_target_group.kong_admin[0].arn
     container_name   = "${var.project_name}-${var.environment}-kong-cp-container"
@@ -725,7 +732,8 @@ resource "aws_ecs_service" "kong_cp" {
 
   depends_on = [
     aws_ecs_service.postgres,
-    aws_lb_listener.kong_admin_nlb
+    aws_lb_listener.kong_admin_nlb,
+    aws_lb_listener.http
   ]
 
   tags = {
@@ -1018,6 +1026,30 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+# ALB Target Group for Kong Admin API
+resource "aws_lb_target_group" "kong_admin" {
+  count       = var.kong_control_plane_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-admin-tg"
+  port        = 8001
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/status"
+    port                = "8001"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-admin-tg"
+  }
+}
+
 # ALB Listener for HTTP (always present)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -1027,6 +1059,42 @@ resource "aws_lb_listener" "http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+# ALB Listener Rule for Kong Admin API (HTTP)
+resource "aws_lb_listener_rule" "kong_admin_http" {
+  count        = var.kong_control_plane_enabled ? 1 : 0
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_admin[0].arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/admin/*"]
+    }
+  }
+}
+
+# ALB Listener Rule for Kong Admin API (HTTPS)
+resource "aws_lb_listener_rule" "kong_admin_https" {
+  count        = var.kong_control_plane_enabled && var.enable_https ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_admin[0].arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/admin/*"]
+    }
   }
 }
 
