@@ -763,7 +763,7 @@ resource "aws_secretsmanager_secret" "kong_cluster_cert" {
   count                   = var.kong_enabled ? 1 : 0
   name                    = "${var.project_name}-${var.environment}-kong-cluster-cert"
   description             = "Kong cluster certificate for hybrid mode"
-  recovery_window_in_days = 0  # Force immediate deletion
+  recovery_window_in_days = 0 # Force immediate deletion
 
   tags = {
     Name = "${var.project_name}-${var.environment}-kong-cluster-cert"
@@ -781,7 +781,7 @@ resource "aws_secretsmanager_secret" "kong_cluster_key" {
   count                   = var.kong_enabled ? 1 : 0
   name                    = "${var.project_name}-${var.environment}-kong-cluster-key"
   description             = "Kong cluster private key for hybrid mode"
-  recovery_window_in_days = 0  # Force immediate deletion
+  recovery_window_in_days = 0 # Force immediate deletion
 
   tags = {
     Name = "${var.project_name}-${var.environment}-kong-cluster-key"
