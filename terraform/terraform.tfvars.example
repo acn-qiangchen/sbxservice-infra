@@ -26,7 +26,7 @@ kong_db_enabled            = true
 kong_db_use_rds  = true  # Use RDS (recommended) or ECS container (false)
 kong_db_name     = "kong"
 kong_db_user     = "kong"
-kong_db_password = "your-secure-password-here"  # CHANGE THIS!
+# kong_db_password = "KongPassword123!"  # Default password, uncomment to override
 
 # RDS-specific configuration (only used if kong_db_use_rds = true)
 kong_db_instance_class      = "db.t3.micro"  # db.t3.small for production

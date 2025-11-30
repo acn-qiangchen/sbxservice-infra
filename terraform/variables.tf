@@ -101,7 +101,7 @@ variable "kong_db_user" {
 variable "kong_db_password" {
   description = "Password for the Kong database"
   type        = string
-  default     = "kong_password_change_me"
+  default     = "KongPassword123!"
   sensitive   = true
 }
 
