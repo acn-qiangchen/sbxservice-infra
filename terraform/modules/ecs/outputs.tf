@@ -101,16 +101,7 @@ output "direct_nlb_target_group_arn" {
   value       = var.direct_routing_enabled ? aws_lb_target_group.direct[0].arn : null
 }
 
-# Kong Gateway secrets outputs
-output "kong_cluster_cert_secret_arn" {
-  description = "ARN of the Kong Gateway cluster certificate secret"
-  value       = var.kong_enabled ? aws_secretsmanager_secret.kong_cluster_cert[0].arn : null
-}
-
-output "kong_cluster_cert_key_secret_arn" {
-  description = "ARN of the Kong Gateway cluster certificate key secret"
-  value       = var.kong_enabled ? aws_secretsmanager_secret.kong_cluster_cert_key[0].arn : null
-}
+# Note: Kong Gateway secrets outputs removed - no longer using Konnect certificates
 
 # Service Discovery outputs
 output "service_discovery_namespace_id" {
@@ -131,4 +122,56 @@ output "hello_service_discovery_arn" {
 output "kong_service_discovery_arn" {
   description = "ARN of the Kong Gateway service discovery service"
   value       = var.kong_enabled ? aws_service_discovery_service.kong_gateway[0].arn : null
+}
+
+# PostgreSQL Database outputs
+output "postgres_service_name" {
+  description = "Name of the PostgreSQL ECS service"
+  value       = var.kong_db_enabled ? aws_ecs_service.postgres[0].name : null
+}
+
+output "postgres_service_discovery_arn" {
+  description = "ARN of the PostgreSQL service discovery service"
+  value       = var.kong_db_enabled ? aws_service_discovery_service.postgres[0].arn : null
+}
+
+output "postgres_dns_name" {
+  description = "DNS name for PostgreSQL service discovery"
+  value       = var.kong_db_enabled ? "postgres.${aws_service_discovery_private_dns_namespace.service_discovery.name}" : null
+}
+
+output "kong_db_password_secret_arn" {
+  description = "ARN of the Kong database password secret"
+  value       = var.kong_db_enabled ? aws_secretsmanager_secret.kong_db_password[0].arn : null
+}
+
+# Kong Control Plane outputs
+output "kong_cp_service_name" {
+  description = "Name of the Kong Control Plane ECS service"
+  value       = var.kong_control_plane_enabled ? aws_ecs_service.kong_cp[0].name : null
+}
+
+output "kong_cp_service_discovery_arn" {
+  description = "ARN of the Kong Control Plane service discovery service"
+  value       = var.kong_control_plane_enabled ? aws_service_discovery_service.kong_cp[0].arn : null
+}
+
+output "kong_cp_dns_name" {
+  description = "DNS name for Kong Control Plane service discovery"
+  value       = var.kong_control_plane_enabled ? "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}" : null
+}
+
+output "kong_cp_log_group_name" {
+  description = "Name of the Kong Control Plane CloudWatch log group"
+  value       = var.kong_control_plane_enabled ? aws_cloudwatch_log_group.kong_cp[0].name : null
+}
+
+output "kong_admin_nlb_dns_name" {
+  description = "DNS name of the Kong Admin API Network Load Balancer"
+  value       = var.kong_control_plane_enabled ? aws_lb.kong_admin_nlb[0].dns_name : null
+}
+
+output "kong_admin_api_endpoint" {
+  description = "Kong Admin API endpoint URL"
+  value       = var.kong_control_plane_enabled ? "http://${aws_lb.kong_admin_nlb[0].dns_name}:8001" : null
 } 

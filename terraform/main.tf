@@ -119,6 +119,27 @@ module "security_groups" {
   vpc_cidr    = var.vpc_cidr
 }
 
+# RDS PostgreSQL for Kong (optional - can use ECS PostgreSQL instead)
+module "rds" {
+  count  = var.kong_db_enabled && var.kong_db_use_rds ? 1 : 0
+  source = "./modules/rds"
+
+  project_name    = var.project_name
+  environment     = var.environment
+  vpc_id          = module.vpc.vpc_id
+  private_subnets = module.vpc.private_subnets
+  database_sg_id  = module.security_groups.database_sg_id
+
+  db_name               = var.kong_db_name
+  db_username           = var.kong_db_user
+  db_password           = var.kong_db_password
+  db_instance_class     = var.kong_db_instance_class
+  db_allocated_storage  = var.kong_db_allocated_storage
+  multi_az              = var.kong_db_multi_az
+  deletion_protection   = var.kong_db_deletion_protection
+  skip_final_snapshot   = var.kong_db_skip_final_snapshot
+}
+
 
 
 # ECS Fargate for Spring Boot Application
@@ -133,6 +154,7 @@ module "ecs" {
   private_subnets   = module.vpc.private_subnets
   public_sg_id      = module.security_groups.public_sg_id
   application_sg_id = module.security_groups.application_sg_id
+  database_sg_id    = module.security_groups.database_sg_id
 
   # Container configuration
   container_image_url = lookup(local.container_images, "hello", "")
@@ -148,6 +170,16 @@ module "ecs" {
   # Kong Gateway configuration
   kong_enabled   = var.kong_enabled
   kong_app_count = 1
+
+  # Kong Database configuration
+  kong_db_enabled            = var.kong_db_enabled
+  kong_db_use_rds            = var.kong_db_use_rds
+  kong_db_name               = var.kong_db_name
+  kong_db_user               = var.kong_db_user
+  kong_db_password           = var.kong_db_password
+  kong_db_host               = var.kong_db_use_rds && var.kong_db_enabled ? module.rds[0].db_instance_address : ""
+  kong_db_port               = var.kong_db_use_rds && var.kong_db_enabled ? module.rds[0].db_instance_port : 5432
+  kong_control_plane_enabled = var.kong_control_plane_enabled
 
   # Direct routing configuration
   direct_routing_enabled = var.direct_routing_enabled
@@ -281,4 +313,41 @@ output "hello_service_dns_name" {
 output "kong_service_dns_name" {
   description = "DNS name for Kong Gateway service discovery"
   value       = var.kong_enabled ? "kong-gateway.${module.ecs.service_discovery_namespace_name}" : null
+}
+
+# Kong Control Plane and Database outputs
+output "postgres_dns_name" {
+  description = "DNS name for PostgreSQL service discovery"
+  value       = module.ecs.postgres_dns_name
+}
+
+output "kong_cp_dns_name" {
+  description = "DNS name for Kong Control Plane service discovery"
+  value       = module.ecs.kong_cp_dns_name
+}
+
+output "kong_admin_api_endpoint" {
+  description = "Kong Admin API endpoint URL for management"
+  value       = module.ecs.kong_admin_api_endpoint
+}
+
+output "kong_admin_nlb_dns_name" {
+  description = "DNS name of the Kong Admin API Network Load Balancer"
+  value       = module.ecs.kong_admin_nlb_dns_name
+}
+
+# RDS outputs
+output "kong_db_endpoint" {
+  description = "Kong RDS database endpoint"
+  value       = var.kong_db_use_rds && var.kong_db_enabled ? module.rds[0].db_instance_endpoint : null
+}
+
+output "kong_db_address" {
+  description = "Kong RDS database address"
+  value       = var.kong_db_use_rds && var.kong_db_enabled ? module.rds[0].db_instance_address : null
+}
+
+output "kong_db_type" {
+  description = "Kong database type (RDS or ECS)"
+  value       = var.kong_db_use_rds ? "RDS PostgreSQL" : "ECS PostgreSQL Container"
 } 

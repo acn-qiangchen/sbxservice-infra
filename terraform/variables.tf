@@ -79,6 +79,74 @@ variable "direct_traffic_weight" {
   default     = 0
 }
 
+# Kong Database configuration
+variable "kong_db_enabled" {
+  description = "Whether to enable PostgreSQL database for Kong"
+  type        = bool
+  default     = true
+}
+
+variable "kong_db_name" {
+  description = "Name of the Kong database"
+  type        = string
+  default     = "kong"
+}
+
+variable "kong_db_user" {
+  description = "Username for the Kong database"
+  type        = string
+  default     = "kong"
+}
+
+variable "kong_db_password" {
+  description = "Password for the Kong database"
+  type        = string
+  default     = "kong_password_change_me"
+  sensitive   = true
+}
+
+variable "kong_control_plane_enabled" {
+  description = "Whether to enable Kong Control Plane"
+  type        = bool
+  default     = true
+}
+
+variable "kong_db_use_rds" {
+  description = "Whether to use RDS for Kong database (true) or ECS container (false)"
+  type        = bool
+  default     = true
+}
+
+variable "kong_db_instance_class" {
+  description = "RDS instance class for Kong database"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "kong_db_allocated_storage" {
+  description = "Allocated storage in GB for Kong RDS database"
+  type        = number
+  default     = 20
+}
+
+variable "kong_db_multi_az" {
+  description = "Enable Multi-AZ deployment for Kong RDS database"
+  type        = bool
+  default     = false
+}
+
+variable "kong_db_deletion_protection" {
+  description = "Enable deletion protection for Kong RDS database"
+  type        = bool
+  default     = false
+}
+
+variable "kong_db_skip_final_snapshot" {
+  description = "Skip final snapshot when deleting Kong RDS database"
+  type        = bool
+  default     = false
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string

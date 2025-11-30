@@ -126,11 +126,13 @@ resource "aws_iam_role_policy_attachment" "task_ecs_exec" {
   policy_arn = aws_iam_policy.ecs_exec_policy.arn
 }
 
-# Create a policy for Kong Gateway secrets access
-resource "aws_iam_policy" "kong_secrets_policy" {
-  count       = var.kong_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-kong-secrets-policy"
-  description = "Allow ECS tasks to read Kong Gateway secrets"
+# Note: Kong secrets policy removed - no longer using Konnect certificates
+
+# Create a policy for database secrets access (for PostgreSQL)
+resource "aws_iam_policy" "db_secrets_policy" {
+  count       = var.kong_db_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-db-secrets-policy"
+  description = "Allow ECS tasks to read database secrets"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -141,19 +143,18 @@ resource "aws_iam_policy" "kong_secrets_policy" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          aws_secretsmanager_secret.kong_cluster_cert[0].arn,
-          aws_secretsmanager_secret.kong_cluster_cert_key[0].arn
+          aws_secretsmanager_secret.kong_db_password[0].arn
         ]
       }
     ]
   })
 }
 
-# Attach Kong secrets policy to execution role (needed for retrieving secrets during startup)
-resource "aws_iam_role_policy_attachment" "execution_kong_secrets" {
-  count      = var.kong_enabled ? 1 : 0
+# Attach database secrets policy to execution role
+resource "aws_iam_role_policy_attachment" "execution_db_secrets" {
+  count      = var.kong_db_enabled ? 1 : 0
   role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = aws_iam_policy.kong_secrets_policy[0].arn
+  policy_arn = aws_iam_policy.db_secrets_policy[0].arn
 }
 
 # CloudWatch Log Group
@@ -286,40 +287,414 @@ resource "aws_cloudwatch_log_group" "kong_app" {
   }
 }
 
-# AWS Secrets Manager secrets for Kong Gateway data plane certificates
-resource "aws_secretsmanager_secret" "kong_cluster_cert" {
-  count       = var.kong_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-kong-cluster-cert"
-  description = "Kong Gateway data plane cluster certificate"
+# CloudWatch Log Group for PostgreSQL (only if using ECS, not RDS)
+resource "aws_cloudwatch_log_group" "postgres" {
+  count             = var.kong_db_enabled && !var.kong_db_use_rds ? 1 : 0
+  name              = "/ecs/${var.project_name}-${var.environment}-postgres"
+  retention_in_days = 30
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-kong-cluster-cert"
+    Name = "${var.project_name}-${var.environment}-postgres-logs"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "kong_cluster_cert" {
-  count         = var.kong_enabled ? 1 : 0
-  secret_id     = aws_secretsmanager_secret.kong_cluster_cert[0].id
-  secret_string = "-----BEGIN CERTIFICATE-----\nMIICKTCCAdCgAwIBAgIBATAKBggqhkjOPQQDBDBGMUQwCQYDVQQGEwJJTjA3BgNV\nBAMeMABrAG8AbgBuAGUAYwB0AC0AbABhAG0AcAAtAHAAbwBjAC0AZwBhAHQAZQB3\nAGEAeTAeFw0yNTA3MjcwNTU4NDFaFw0zNTA3MjcwNTU4NDFaMEYxRDAJBgNVBAYT\nAklOMDcGA1UEAx4wAGsAbwBuAG4AZQBjAHQALQBsAGEAbQBwAC0AcABvAGMALQBn\nAGEAdABlAHcAYQB5MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuP7Dt4ib61GD\nXzvu8gYmexoSeAEsxP3mtZMkhve6ReqAKgG7iC5jKL3Cpy3+z+PZ3NQA+ZQRmRJa\noKurc+P6LKOBrjCBqzAMBgNVHRMBAf8EAjAAMAsGA1UdDwQEAwIABjAdBgNVHSUE\nFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwFwYJKwYBBAGCNxQCBAoMCGNlcnRUeXBl\nMCMGCSsGAQQBgjcVAgQWBBQBAQEBAQEBAQEBAQEBAQEBAQEBATAcBgkrBgEEAYI3\nFQcEDzANBgUpAQEBAQIBCgIBFDATBgkrBgEEAYI3FQEEBgIEABQACjAKBggqhkjO\nPQQDBANHADBEAiAB3RZjBRvICZjAMPxo1mMeRKFqJxWbN6jCuW3xaV6uXAIgaxSE\nMT0X1vjWHO1PkpqjLRbm5ibaDDJ0z0DepwMq7ZI=\n-----END CERTIFICATE-----"
-}
-
-resource "aws_secretsmanager_secret" "kong_cluster_cert_key" {
-  count       = var.kong_enabled ? 1 : 0
-  name        = "${var.project_name}-${var.environment}-kong-cluster-cert-key"
-  description = "Kong Gateway data plane cluster certificate private key"
+# AWS Secrets Manager secret for Kong database password
+resource "aws_secretsmanager_secret" "kong_db_password" {
+  count       = var.kong_db_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-db-password"
+  description = "Kong database password"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-kong-cluster-cert-key"
+    Name = "${var.project_name}-${var.environment}-kong-db-password"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "kong_cluster_cert_key" {
-  count         = var.kong_enabled ? 1 : 0
-  secret_id     = aws_secretsmanager_secret.kong_cluster_cert_key[0].id
-  secret_string = "-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgomvslPtc3x9O32Rf\nAwVd8rfQ8v12KbgB8q90XWbeAeCgCgYIKoZIzj0DAQehRANCAAS4/sO3iJvrUYNf\nO+7yBiZ7GhJ4ASzE/ea1kySG97pF6oAqAbuILmMovcKnLf7P49nc1AD5lBGZElqg\nq6tz4/os\n-----END PRIVATE KEY-----"
+resource "aws_secretsmanager_secret_version" "kong_db_password" {
+  count         = var.kong_db_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.kong_db_password[0].id
+  secret_string = var.kong_db_password != "" ? var.kong_db_password : "kong_password_change_me"
 }
 
-# Kong Gateway ECS Task Definition
+# PostgreSQL ECS Task Definition (only if not using RDS)
+resource "aws_ecs_task_definition" "postgres" {
+  count                    = var.kong_db_enabled && !var.kong_db_use_rds ? 1 : 0
+  family                   = "${var.project_name}-${var.environment}-postgres-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "${var.project_name}-${var.environment}-postgres-container"
+      image     = "postgres:13-alpine"
+      cpu       = 512
+      memory    = 1024
+      essential = true
+      portMappings = [
+        {
+          containerPort = 5432
+          hostPort      = 5432
+          protocol      = "tcp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.postgres[0].name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "postgres"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "pg_isready -U ${var.kong_db_user} -d ${var.kong_db_name}"]
+        interval    = 30
+        retries     = 3
+        timeout     = 5
+        startPeriod = 60
+      }
+      environment = [
+        {
+          name  = "POSTGRES_DB"
+          value = var.kong_db_name
+        },
+        {
+          name  = "POSTGRES_USER"
+          value = var.kong_db_user
+        }
+      ]
+      secrets = [
+        {
+          name      = "POSTGRES_PASSWORD"
+          valueFrom = aws_secretsmanager_secret.kong_db_password[0].arn
+        }
+      ]
+    }
+  ])
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-postgres-task"
+  }
+}
+
+# AWS Cloud Map Service for PostgreSQL service discovery (only if using ECS)
+resource "aws_service_discovery_service" "postgres" {
+  count = var.kong_db_enabled && !var.kong_db_use_rds ? 1 : 0
+  name  = "postgres"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.service_discovery.id
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-postgres-discovery-service"
+  }
+}
+
+# PostgreSQL ECS Service (only if not using RDS)
+resource "aws_ecs_service" "postgres" {
+  count                              = var.kong_db_enabled && !var.kong_db_use_rds ? 1 : 0
+  name                               = "${var.project_name}-${var.environment}-postgres-service"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.postgres[0].arn
+  desired_count                      = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+  launch_type                        = "FARGATE"
+  scheduling_strategy                = "REPLICA"
+  enable_execute_command             = true
+
+  network_configuration {
+    security_groups  = [var.database_sg_id != "" ? var.database_sg_id : var.application_sg_id]
+    subnets          = var.private_subnets
+    assign_public_ip = false
+  }
+
+  # Register service in Cloud Map for service discovery
+  service_registries {
+    registry_arn = aws_service_discovery_service.postgres[0].arn
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-postgres-service"
+  }
+}
+
+# CloudWatch Log Group for Kong Control Plane
+resource "aws_cloudwatch_log_group" "kong_cp" {
+  count             = var.kong_control_plane_enabled ? 1 : 0
+  name              = "/ecs/${var.project_name}-${var.environment}-kong-cp"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-cp-logs"
+  }
+}
+
+# Kong Control Plane ECS Task Definition
+resource "aws_ecs_task_definition" "kong_cp" {
+  count                    = var.kong_control_plane_enabled ? 1 : 0
+  family                   = "${var.project_name}-${var.environment}-kong-cp-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 1024
+  memory                   = 2048
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "${var.project_name}-${var.environment}-kong-cp-container"
+      image     = "kong:3.8-alpine"
+      cpu       = 1024
+      memory    = 2048
+      essential = true
+      portMappings = [
+        {
+          containerPort = 8001
+          hostPort      = 8001
+          protocol      = "tcp"
+        },
+        {
+          containerPort = 8444
+          hostPort      = 8444
+          protocol      = "tcp"
+        },
+        {
+          containerPort = 8005
+          hostPort      = 8005
+          protocol      = "tcp"
+        },
+        {
+          containerPort = 8006
+          hostPort      = 8006
+          protocol      = "tcp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.kong_cp[0].name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "kong-cp"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "kong health || exit 1"]
+        interval    = 30
+        retries     = 3
+        timeout     = 5
+        startPeriod = 120
+      }
+      environment = [
+        {
+          name  = "KONG_ROLE"
+          value = "control_plane"
+        },
+        {
+          name  = "KONG_DATABASE"
+          value = "postgres"
+        },
+        {
+          name  = "KONG_PG_HOST"
+          value = var.kong_db_host != "" ? var.kong_db_host : "postgres.${aws_service_discovery_private_dns_namespace.service_discovery.name}"
+        },
+        {
+          name  = "KONG_PG_PORT"
+          value = tostring(var.kong_db_port)
+        },
+        {
+          name  = "KONG_PG_USER"
+          value = var.kong_db_user
+        },
+        {
+          name  = "KONG_PG_DATABASE"
+          value = var.kong_db_name
+        },
+        {
+          name  = "KONG_ADMIN_LISTEN"
+          value = "0.0.0.0:8001"
+        },
+        {
+          name  = "KONG_ADMIN_GUI_LISTEN"
+          value = "0.0.0.0:8002"
+        },
+        {
+          name  = "KONG_CLUSTER_LISTEN"
+          value = "0.0.0.0:8005"
+        },
+        {
+          name  = "KONG_CLUSTER_TELEMETRY_LISTEN"
+          value = "0.0.0.0:8006"
+        },
+        {
+          name  = "KONG_PROXY_ACCESS_LOG"
+          value = "/dev/stdout"
+        },
+        {
+          name  = "KONG_ADMIN_ACCESS_LOG"
+          value = "/dev/stdout"
+        },
+        {
+          name  = "KONG_PROXY_ERROR_LOG"
+          value = "/dev/stderr"
+        },
+        {
+          name  = "KONG_ADMIN_ERROR_LOG"
+          value = "/dev/stderr"
+        }
+      ]
+      secrets = [
+        {
+          name      = "KONG_PG_PASSWORD"
+          valueFrom = aws_secretsmanager_secret.kong_db_password[0].arn
+        }
+      ]
+      command = ["sh", "-c", "kong migrations bootstrap && kong migrations up && kong start"]
+    }
+  ])
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-cp-task"
+  }
+}
+
+# AWS Cloud Map Service for Kong Control Plane service discovery
+resource "aws_service_discovery_service" "kong_cp" {
+  count = var.kong_control_plane_enabled ? 1 : 0
+  name  = "kong-cp"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.service_discovery.id
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-cp-discovery-service"
+  }
+}
+
+# Network Load Balancer for Kong Admin API
+resource "aws_lb" "kong_admin_nlb" {
+  count              = var.kong_control_plane_enabled ? 1 : 0
+  name               = "${var.project_name}-${var.environment}-kong-admin-nlb"
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = var.private_subnets
+
+  enable_deletion_protection       = false
+  enable_cross_zone_load_balancing = true
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-admin-nlb"
+  }
+}
+
+# NLB Target Group for Kong Admin API (port 8001)
+resource "aws_lb_target_group" "kong_admin" {
+  count       = var.kong_control_plane_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-admin"
+  port        = 8001
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    interval            = 30
+    protocol            = "HTTP"
+    port                = "8001"
+    path                = "/status"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-admin"
+  }
+}
+
+# NLB Listener for Kong Admin API
+resource "aws_lb_listener" "kong_admin_nlb" {
+  count             = var.kong_control_plane_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.kong_admin_nlb[0].arn
+  port              = "8001"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_admin[0].arn
+  }
+}
+
+# Kong Control Plane ECS Service
+resource "aws_ecs_service" "kong_cp" {
+  count                              = var.kong_control_plane_enabled ? 1 : 0
+  name                               = "${var.project_name}-${var.environment}-kong-cp-service"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.kong_cp[0].arn
+  desired_count                      = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+  launch_type                        = "FARGATE"
+  scheduling_strategy                = "REPLICA"
+  enable_execute_command             = true
+
+  network_configuration {
+    security_groups  = [var.application_sg_id]
+    subnets          = var.private_subnets
+    assign_public_ip = false
+  }
+
+  # Register Kong Admin API to NLB target group
+  load_balancer {
+    target_group_arn = aws_lb_target_group.kong_admin[0].arn
+    container_name   = "${var.project_name}-${var.environment}-kong-cp-container"
+    container_port   = 8001
+  }
+
+  # Register service in Cloud Map for service discovery
+  service_registries {
+    registry_arn = aws_service_discovery_service.kong_cp[0].arn
+  }
+
+  depends_on = [
+    aws_ecs_service.postgres,
+    aws_lb_listener.kong_admin_nlb
+  ]
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-cp-service"
+  }
+}
+
+# Note: Konnect certificates removed - using self-hosted control plane instead
+
+# Kong Gateway Data Plane ECS Task Definition
 resource "aws_ecs_task_definition" "kong_gateway" {
   count                    = var.kong_enabled ? 1 : 0
   family                   = "${var.project_name}-${var.environment}-kong-task"
@@ -333,7 +708,7 @@ resource "aws_ecs_task_definition" "kong_gateway" {
   container_definitions = jsonencode([
     {
       name      = "${var.project_name}-${var.environment}-kong-container"
-      image     = "kong/kong-gateway:3.11"
+      image     = "kong:3.8-alpine"
       cpu       = var.task_cpu
       memory    = var.task_memory
       essential = true
@@ -379,58 +754,32 @@ resource "aws_ecs_task_definition" "kong_gateway" {
           value = "off"
         },
         {
-          name  = "KONG_VITALS"
-          value = "off"
-        },
-        {
-          name  = "KONG_CLUSTER_MTLS"
-          value = "pki"
-        },
-        {
           name  = "KONG_CLUSTER_CONTROL_PLANE"
-          value = "23b805b4eb.in.cp0.konghq.com:443"
-        },
-        {
-          name  = "KONG_CLUSTER_SERVER_NAME"
-          value = "23b805b4eb.in.cp0.konghq.com"
+          value = "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}:8005"
         },
         {
           name  = "KONG_CLUSTER_TELEMETRY_ENDPOINT"
-          value = "23b805b4eb.in.tp0.konghq.com:443"
-        },
-        {
-          name  = "KONG_CLUSTER_TELEMETRY_SERVER_NAME"
-          value = "23b805b4eb.in.tp0.konghq.com"
+          value = "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}:8006"
         },
         {
           name  = "KONG_LUA_SSL_TRUSTED_CERTIFICATE"
           value = "system"
         },
         {
-          name  = "KONG_KONNECT_MODE"
-          value = "on"
-        },
-        {
           name  = "KONG_CLUSTER_DP_LABELS"
-          value = "type:ecs-fargate"
-        },
-        {
-          name  = "KONG_ROUTER_FLAVOR"
-          value = "expressions"
+          value = "type:ecs-fargate,env:${var.environment}"
         },
         {
           name  = "KONG_STATUS_LISTEN"
           value = "0.0.0.0:8100"
-        }
-      ]
-      secrets = [
-        {
-          name      = "KONG_CLUSTER_CERT"
-          valueFrom = aws_secretsmanager_secret.kong_cluster_cert[0].arn
         },
         {
-          name      = "KONG_CLUSTER_CERT_KEY"
-          valueFrom = aws_secretsmanager_secret.kong_cluster_cert_key[0].arn
+          name  = "KONG_PROXY_ACCESS_LOG"
+          value = "/dev/stdout"
+        },
+        {
+          name  = "KONG_PROXY_ERROR_LOG"
+          value = "/dev/stderr"
         }
       ]
     }
@@ -810,7 +1159,8 @@ resource "aws_ecs_service" "kong_gateway" {
 
   depends_on = [
     aws_lb_listener.kong_nlb,
-    aws_lb_listener.kong_nlb_health
+    aws_lb_listener.kong_nlb_health,
+    aws_ecs_service.kong_cp
   ]
 
   tags = {
