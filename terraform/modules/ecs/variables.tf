@@ -101,4 +101,31 @@ variable "kong_app_count" {
   description = "Number of Kong Gateway containers to run"
   type        = number
   default     = 1
+}
+
+# Direct routing variables
+variable "direct_routing_enabled" {
+  description = "Whether to enable direct routing to Hello-Service (bypassing Kong Gateway)"
+  type        = bool
+  default     = false
+}
+
+variable "kong_traffic_weight" {
+  description = "Percentage of traffic to send through Kong Gateway (0-100)"
+  type        = number
+  default     = 100
+  validation {
+    condition     = var.kong_traffic_weight >= 0 && var.kong_traffic_weight <= 100
+    error_message = "Kong traffic weight must be between 0 and 100."
+  }
+}
+
+variable "direct_traffic_weight" {
+  description = "Percentage of traffic to send directly to Hello-Service (0-100)"
+  type        = number
+  default     = 0
+  validation {
+    condition     = var.direct_traffic_weight >= 0 && var.direct_traffic_weight <= 100
+    error_message = "Direct traffic weight must be between 0 and 100."
+  }
 } 

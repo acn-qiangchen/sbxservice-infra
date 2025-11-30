@@ -61,6 +61,24 @@ variable "kong_enabled" {
   default     = true
 }
 
+variable "direct_routing_enabled" {
+  description = "Whether to enable direct routing to Hello-Service (bypassing Kong Gateway)"
+  type        = bool
+  default     = false
+}
+
+variable "kong_traffic_weight" {
+  description = "Percentage of traffic to send through Kong Gateway (0-100)"
+  type        = number
+  default     = 100
+}
+
+variable "direct_traffic_weight" {
+  description = "Percentage of traffic to send directly to Hello-Service (0-100)"
+  type        = number
+  default     = 0
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
