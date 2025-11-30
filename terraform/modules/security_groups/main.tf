@@ -22,6 +22,15 @@ resource "aws_security_group" "public" {
     description = "HTTPS access from anywhere"
   }
 
+  # Kong Admin GUI access from anywhere (port 8002)
+  ingress {
+    from_port   = 8002
+    to_port     = 8002
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Kong Admin GUI access from anywhere"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

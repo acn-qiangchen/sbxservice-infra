@@ -725,6 +725,13 @@ resource "aws_ecs_service" "kong_cp" {
     container_port   = 8001
   }
 
+  # Register Kong Admin GUI to ALB target group (for demo access)
+  load_balancer {
+    target_group_arn = aws_lb_target_group.kong_admin_gui[0].arn
+    container_name   = "${var.project_name}-${var.environment}-kong-cp-container"
+    container_port   = 8002
+  }
+
   # Register service in Cloud Map for service discovery
   service_registries {
     registry_arn = aws_service_discovery_service.kong_cp[0].arn
@@ -733,7 +740,8 @@ resource "aws_ecs_service" "kong_cp" {
   depends_on = [
     aws_ecs_service.postgres,
     aws_lb_listener.kong_admin_nlb,
-    aws_lb_listener.http
+    aws_lb_listener.http,
+    aws_lb_listener.kong_admin_gui
   ]
 
   tags = {
@@ -1050,6 +1058,30 @@ resource "aws_lb_target_group" "kong_admin" {
   }
 }
 
+# ALB Target Group for Kong Admin GUI
+resource "aws_lb_target_group" "kong_admin_gui" {
+  count       = var.kong_control_plane_enabled ? 1 : 0
+  name        = "${var.project_name}-${var.environment}-kong-gui-tg"
+  port        = 8002
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/"
+    port                = "8002"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200,404"
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-kong-gui-tg"
+  }
+}
+
 # ALB Listener for HTTP (always present)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -1059,6 +1091,19 @@ resource "aws_lb_listener" "http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+# ALB Listener for Kong Admin GUI (port 8002)
+resource "aws_lb_listener" "kong_admin_gui" {
+  count             = var.kong_control_plane_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.main.arn
+  port              = 8002
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_admin_gui[0].arn
   }
 }
 

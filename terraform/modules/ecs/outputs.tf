@@ -174,4 +174,9 @@ output "kong_admin_nlb_dns_name" {
 output "kong_admin_api_endpoint" {
   description = "Kong Admin API endpoint URL"
   value       = var.kong_control_plane_enabled ? "http://${aws_lb.kong_admin_nlb[0].dns_name}:8001" : null
+}
+
+output "kong_admin_gui_endpoint" {
+  description = "Kong Admin GUI endpoint URL (via ALB)"
+  value       = var.kong_control_plane_enabled ? "http://${aws_lb.main.dns_name}:8002" : null
 } 
