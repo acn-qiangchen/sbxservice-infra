@@ -498,6 +498,11 @@ resource "aws_ecs_task_definition" "kong_cp" {
           protocol      = "tcp"
         },
         {
+          containerPort = 8002
+          hostPort      = 8002
+          protocol      = "tcp"
+        },
+        {
           containerPort = 8444
           hostPort      = 8444
           protocol      = "tcp"
