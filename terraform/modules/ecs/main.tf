@@ -567,6 +567,14 @@ resource "aws_ecs_task_definition" "kong_cp" {
           value = "0.0.0.0:8002"
         },
         {
+          name  = "KONG_ADMIN_GUI_URL"
+          value = "http://${aws_lb.main.dns_name}:8002"
+        },
+        {
+          name  = "KONG_ADMIN_GUI_API_URL"
+          value = "http://${aws_lb.main.dns_name}:8001"
+        },
+        {
           name  = "KONG_CLUSTER_LISTEN"
           value = "0.0.0.0:8005"
         },
@@ -1099,6 +1107,19 @@ resource "aws_lb_listener" "http" {
   }
 }
 
+# ALB Listener for Kong Admin API (port 8001)
+resource "aws_lb_listener" "kong_admin_api" {
+  count             = var.kong_control_plane_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.main.arn
+  port              = 8001
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong_admin[0].arn
+  }
+}
+
 # ALB Listener for Kong Admin GUI (port 8002)
 resource "aws_lb_listener" "kong_admin_gui" {
   count             = var.kong_control_plane_enabled ? 1 : 0
@@ -1109,42 +1130,6 @@ resource "aws_lb_listener" "kong_admin_gui" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.kong_admin_gui[0].arn
-  }
-}
-
-# ALB Listener Rule for Kong Admin API (HTTP)
-resource "aws_lb_listener_rule" "kong_admin_http" {
-  count        = var.kong_control_plane_enabled ? 1 : 0
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 100
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.kong_admin[0].arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/admin/*"]
-    }
-  }
-}
-
-# ALB Listener Rule for Kong Admin API (HTTPS)
-resource "aws_lb_listener_rule" "kong_admin_https" {
-  count        = var.kong_control_plane_enabled && var.enable_https ? 1 : 0
-  listener_arn = aws_lb_listener.https[0].arn
-  priority     = 100
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.kong_admin[0].arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/admin/*"]
-    }
   }
 }
 
