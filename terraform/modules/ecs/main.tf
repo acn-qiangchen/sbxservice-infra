@@ -892,6 +892,10 @@ resource "aws_ecs_task_definition" "kong_gateway" {
           value = "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}:8006"
         },
         {
+          name  = "KONG_CLUSTER_MTLS"
+          value = "shared"
+        },
+        {
           name  = "KONG_LUA_SSL_TRUSTED_CERTIFICATE"
           value = "system"
         },
