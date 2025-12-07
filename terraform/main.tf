@@ -119,6 +119,27 @@ module "security_groups" {
   vpc_cidr    = var.vpc_cidr
 }
 
+# RDS PostgreSQL for Kong (optional - can use ECS PostgreSQL instead)
+module "rds" {
+  count  = var.kong_db_enabled && var.kong_db_use_rds ? 1 : 0
+  source = "./modules/rds"
+
+  project_name    = var.project_name
+  environment     = var.environment
+  vpc_id          = module.vpc.vpc_id
+  private_subnets = module.vpc.private_subnets
+  database_sg_id  = module.security_groups.database_sg_id
+
+  db_name              = var.kong_db_name
+  db_username          = var.kong_db_user
+  db_password          = var.kong_db_password
+  db_instance_class    = var.kong_db_instance_class
+  db_allocated_storage = var.kong_db_allocated_storage
+  multi_az             = var.kong_db_multi_az
+  deletion_protection  = var.kong_db_deletion_protection
+  skip_final_snapshot  = var.kong_db_skip_final_snapshot
+}
+
 
 
 # ECS Fargate for Spring Boot Application
@@ -133,6 +154,7 @@ module "ecs" {
   private_subnets   = module.vpc.private_subnets
   public_sg_id      = module.security_groups.public_sg_id
   application_sg_id = module.security_groups.application_sg_id
+  database_sg_id    = module.security_groups.database_sg_id
 
   # Container configuration
   container_image_url = lookup(local.container_images, "hello", "")
@@ -148,6 +170,16 @@ module "ecs" {
   # Kong Gateway configuration
   kong_enabled   = var.kong_enabled
   kong_app_count = 1
+
+  # Kong Database configuration
+  kong_db_enabled            = var.kong_db_enabled
+  kong_db_use_rds            = var.kong_db_use_rds
+  kong_db_name               = var.kong_db_name
+  kong_db_user               = var.kong_db_user
+  kong_db_password           = var.kong_db_password
+  kong_db_host               = var.kong_db_use_rds && var.kong_db_enabled ? module.rds[0].db_instance_address : ""
+  kong_db_port               = var.kong_db_use_rds && var.kong_db_enabled ? module.rds[0].db_instance_port : 5432
+  kong_control_plane_enabled = var.kong_control_plane_enabled
 
   # Direct routing configuration
   direct_routing_enabled = var.direct_routing_enabled
@@ -188,97 +220,4 @@ resource "aws_cloudwatch_log_group" "app_logs" {
   tags = {
     Name = "sbxservice-${var.environment}-logs"
   }
-}
-
-# Outputs
-output "api_gateway_endpoint" {
-  description = "The API Gateway endpoint URL"
-  value       = module.api_gateway.api_endpoint
-}
-
-output "alb_dns_name" {
-  description = "The DNS name of the load balancer"
-  value       = module.ecs.alb_dns_name
-}
-
-
-
-
-
-# Output container images being used
-output "container_images" {
-  description = "Map of container images being used for each service"
-  value       = local.container_images
-}
-
-# Certificate and domain outputs
-output "certificate_arn" {
-  description = "ARN of the ACM certificate"
-  value       = aws_acm_certificate_validation.main.certificate_arn
-}
-
-output "domain_name" {
-  description = "Base domain name"
-  value       = local.domain_name
-}
-
-output "alb_custom_domain" {
-  description = "Custom domain name for the ALB"
-  value       = local.alb_domain_name
-}
-
-output "alb_custom_domain_url" {
-  description = "HTTPS URL for the ALB custom domain"
-  value       = "https://${local.alb_domain_name}"
-}
-
-# Kong Gateway outputs
-output "kong_nlb_dns_name" {
-  description = "DNS name of the Kong Gateway Network Load Balancer"
-  value       = module.ecs.kong_nlb_dns_name
-}
-
-output "kong_service_name" {
-  description = "Name of the Kong Gateway ECS service"
-  value       = module.ecs.kong_service_name
-}
-
-output "kong_enabled" {
-  description = "Whether Kong Gateway is enabled"
-  value       = var.kong_enabled
-}
-
-# Direct routing outputs
-output "direct_routing_enabled" {
-  description = "Whether direct routing is enabled"
-  value       = var.direct_routing_enabled
-}
-
-output "direct_nlb_dns_name" {
-  description = "DNS name of the Direct Network Load Balancer"
-  value       = module.ecs.direct_nlb_dns_name
-}
-
-output "traffic_routing_weights" {
-  description = "Current traffic routing weights"
-  value = {
-    kong_weight   = var.kong_traffic_weight
-    direct_weight = var.direct_traffic_weight
-  }
-}
-
-# Service Discovery outputs
-output "service_discovery_namespace" {
-  description = "Service discovery namespace name"
-  value       = module.ecs.service_discovery_namespace_name
-}
-
-output "hello_service_dns_name" {
-  description = "DNS name for hello-service discovery"
-  value       = "${var.project_name}.${module.ecs.service_discovery_namespace_name}"
-}
-
-output "kong_service_dns_name" {
-  description = "DNS name for Kong Gateway service discovery"
-  value       = var.kong_enabled ? "kong-gateway.${module.ecs.service_discovery_namespace_name}" : null
 } 
