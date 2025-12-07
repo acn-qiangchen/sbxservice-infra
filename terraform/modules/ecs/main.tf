@@ -779,12 +779,19 @@ resource "tls_self_signed_cert" "kong_cluster" {
   }
 
   # Subject Alternative Names - include all possible hostnames
+  # Must match the Cloud Map service discovery hostname used by Data Plane
   dns_names = [
     "kong-cluster",
     "kong-cp",
-    "kong-cp.${var.project_name}.${var.environment}.local",
-    "*.${var.project_name}.${var.environment}.local",
+    "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}",
+    "*.${aws_service_discovery_private_dns_namespace.service_discovery.name}",
+    "*.ec2.internal",
     "localhost"
+  ]
+
+  # Also allow IP addresses (ECS tasks may connect via IP)
+  ip_addresses = [
+    "127.0.0.1"
   ]
 
   validity_period_hours = 87600 # 10 years
@@ -905,8 +912,8 @@ resource "aws_ecs_task_definition" "kong_gateway" {
           value = "shared"
         },
         {
-          name  = "KONG_LUA_SSL_TRUSTED_CERTIFICATE"
-          value = "system"
+          name  = "KONG_CLUSTER_SERVER_NAME"
+          value = "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}"
         },
         {
           name  = "KONG_CLUSTER_DP_LABELS"
