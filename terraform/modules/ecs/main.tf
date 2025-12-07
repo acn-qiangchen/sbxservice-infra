@@ -774,25 +774,10 @@ resource "tls_self_signed_cert" "kong_cluster" {
   private_key_pem = tls_private_key.kong_cluster[0].private_key_pem
 
   subject {
-    common_name  = "kong-cluster"
+    # IMPORTANT: Kong hybrid mode requires CN to be exactly "kong_clustering"
+    common_name  = "kong_clustering"
     organization = var.project_name
   }
-
-  # Subject Alternative Names - include all possible hostnames
-  # Must match the Cloud Map service discovery hostname used by Data Plane
-  dns_names = [
-    "kong-cluster",
-    "kong-cp",
-    "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}",
-    "*.${aws_service_discovery_private_dns_namespace.service_discovery.name}",
-    "*.ec2.internal",
-    "localhost"
-  ]
-
-  # Also allow IP addresses (ECS tasks may connect via IP)
-  ip_addresses = [
-    "127.0.0.1"
-  ]
 
   validity_period_hours = 87600 # 10 years
 
@@ -910,10 +895,6 @@ resource "aws_ecs_task_definition" "kong_gateway" {
         {
           name  = "KONG_CLUSTER_MTLS"
           value = "shared"
-        },
-        {
-          name  = "KONG_CLUSTER_SERVER_NAME"
-          value = "kong-cp.${aws_service_discovery_private_dns_namespace.service_discovery.name}"
         },
         {
           name  = "KONG_CLUSTER_DP_LABELS"
