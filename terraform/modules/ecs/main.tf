@@ -778,6 +778,15 @@ resource "tls_self_signed_cert" "kong_cluster" {
     organization = var.project_name
   }
 
+  # Subject Alternative Names - include all possible hostnames
+  dns_names = [
+    "kong-cluster",
+    "kong-cp",
+    "kong-cp.${var.project_name}.${var.environment}.local",
+    "*.${var.project_name}.${var.environment}.local",
+    "localhost"
+  ]
+
   validity_period_hours = 87600 # 10 years
 
   allowed_uses = [
