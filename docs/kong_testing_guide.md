@@ -182,7 +182,7 @@ curl -X DELETE $KONG_ADMIN_URL/services/test-service
 export ALB_URL=$(cd terraform && terraform output -raw alb_custom_domain_url)
 
 # Test hello endpoint
-curl -v $ALB_URL/hello
+curl -v $ALB_URL/sbx/api/hello
 
 # Expected: HTTP 200 with hello message
 
@@ -208,7 +208,7 @@ curl -v http://$KONG_NLB:8000/hello
 ```bash
 # Make multiple requests
 for i in {1..10}; do
-  curl -s $ALB_URL/hello
+  curl -s $ALB_URL/sbx/api/hello
   echo ""
 done
 
@@ -281,7 +281,7 @@ curl -X POST $KONG_ADMIN_URL/services/hello-service/plugins \
 
 # Test rate limiting
 for i in {1..10}; do
-  curl -w "\nStatus: %{http_code}\n" $ALB_URL/hello
+  curl -w "\nStatus: %{http_code}\n" $ALB_URL/sbx/api/hello
   sleep 1
 done
 
@@ -297,7 +297,7 @@ curl -X POST $KONG_ADMIN_URL/services/hello-service/plugins \
   -d "config.path=/dev/stdout"
 
 # Make a request
-curl $ALB_URL/hello
+curl $ALB_URL/sbx/api/hello
 
 # Check logs for request details
 aws logs tail /ecs/sbxservice-dev-kong --since 1m
@@ -322,7 +322,7 @@ curl -X POST $KONG_ADMIN_URL/services/hello-service/plugins \
   }'
 
 # Test CORS headers
-curl -v -H "Origin: http://example.com" $ALB_URL/hello | grep -i "access-control"
+curl -v -H "Origin: http://example.com" $ALB_URL/sbx/api/hello | grep -i "access-control"
 
 # Expected: CORS headers in response
 ```
@@ -364,7 +364,7 @@ aws ecs stop-task --cluster sbxservice-dev-cluster --task $TASK_ARN
 
 # Traffic should continue through other data planes
 while true; do
-  curl -s $ALB_URL/hello && echo " - OK"
+  curl -s $ALB_URL/sbx/api/hello && echo " - OK"
   sleep 1
 done
 
@@ -383,7 +383,7 @@ TASK_ARN=$(aws ecs list-tasks \
 aws ecs stop-task --cluster sbxservice-dev-cluster --task $TASK_ARN
 
 # Data planes should continue serving with cached config
-curl $ALB_URL/hello
+curl $ALB_URL/sbx/api/hello
 
 # Expected: Still works (data planes are DB-less)
 
@@ -412,7 +412,7 @@ curl $KONG_ADMIN_URL/status
 # go install github.com/rakyll/hey@latest
 
 # Run load test
-hey -n 1000 -c 10 $ALB_URL/hello
+hey -n 1000 -c 10 $ALB_URL/sbx/api/hello
 
 # Check results:
 # - Total requests
