@@ -4,14 +4,19 @@ This repository contains the infrastructure code for deploying the SBXService pl
 
 ## Architecture
 
-This infrastructure implements a minimal architecture with the following components:
+This infrastructure implements a comprehensive architecture with the following components:
 
 - AWS ECS Fargate for container orchestration
-- Amazon API Gateway for API access
+- Kong Gateway OSS for API management and routing
+- Amazon API Gateway for external API access
 - AWS Application Load Balancer
+- PostgreSQL database for Kong configuration
 - Amazon CloudWatch for monitoring
 
-For architecture details, see [POC Architecture](docs/poc_architecture.md).
+For architecture details, see:
+- [POC Architecture](docs/poc_architecture.md)
+- [Kong Gateway Demo Guide](docs/kong_gateway_demo.md)
+- [Kong Quick Start](docs/kong_quick_start.md)
 
 ## Project Structure
 
@@ -28,6 +33,46 @@ For architecture details, see [POC Architecture](docs/poc_architecture.md).
 │   ├── main.tf              # Main Terraform configuration
 │   └── variables.tf         # Terraform variables
 ```
+
+## Kong Gateway Setup
+
+This infrastructure includes a self-hosted Kong Gateway OSS deployment with centralized management:
+
+### Quick Start
+
+```bash
+# 1. Deploy infrastructure
+cd terraform
+terraform init
+terraform apply
+
+# 2. Configure Kong with hello-service
+export KONG_ADMIN_URL=$(terraform output -raw kong_admin_api_endpoint)
+cd ..
+./scripts/kong-setup.sh setup
+
+# 3. Test
+ALB_URL=$(cd terraform && terraform output -raw alb_custom_domain_url)
+curl $ALB_URL/hello
+```
+
+See [Kong Quick Start Guide](docs/kong_quick_start.md) for detailed instructions.
+
+### Kong Architecture
+
+- **Control Plane**: Manages configuration, stores in PostgreSQL
+- **Data Planes**: Handle traffic routing (scalable)
+- **Admin API**: Centralized management interface
+- **Database**: RDS PostgreSQL (recommended) or ECS PostgreSQL for configuration persistence
+
+### Key Features
+
+- ✅ **Free & Open Source**: Kong Gateway OSS (no licensing costs)
+- ✅ **Centralized Management**: Single control plane for all data planes
+- ✅ **Scalable**: Add data planes as needed
+- ✅ **Service Discovery**: Automatic service registration
+- ✅ **Load Balancing**: Built-in load balancing across services
+- ✅ **Plugins**: Rate limiting, authentication, logging, and more
 
 ## Application Services
 

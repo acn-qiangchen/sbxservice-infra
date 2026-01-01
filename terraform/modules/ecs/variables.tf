@@ -38,6 +38,12 @@ variable "application_sg_id" {
   type        = string
 }
 
+variable "database_sg_id" {
+  description = "ID of the database security group"
+  type        = string
+  default     = ""
+}
+
 variable "container_image_url" {
   description = "URL of the container image in ECR"
   type        = string
@@ -128,4 +134,54 @@ variable "direct_traffic_weight" {
     condition     = var.direct_traffic_weight >= 0 && var.direct_traffic_weight <= 100
     error_message = "Direct traffic weight must be between 0 and 100."
   }
+}
+
+# Kong Database variables
+variable "kong_db_enabled" {
+  description = "Whether to enable PostgreSQL database for Kong"
+  type        = bool
+  default     = true
+}
+
+variable "kong_db_name" {
+  description = "Name of the Kong database"
+  type        = string
+  default     = "kong"
+}
+
+variable "kong_db_user" {
+  description = "Username for the Kong database"
+  type        = string
+  default     = "kong"
+}
+
+variable "kong_db_password" {
+  description = "Password for the Kong database"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "kong_db_host" {
+  description = "Hostname of the Kong database (RDS endpoint or service discovery name)"
+  type        = string
+  default     = ""
+}
+
+variable "kong_db_port" {
+  description = "Port of the Kong database"
+  type        = number
+  default     = 5432
+}
+
+variable "kong_control_plane_enabled" {
+  description = "Whether to enable Kong Control Plane"
+  type        = bool
+  default     = true
+}
+
+variable "kong_db_use_rds" {
+  description = "Whether to use RDS for Kong database (true) or ECS container (false)"
+  type        = bool
+  default     = true
 } 
