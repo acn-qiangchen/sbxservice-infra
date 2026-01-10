@@ -2,17 +2,44 @@
 # Copy this file to terraform.tfvars and update as needed
 
 # AWS Configuration
-aws_region  = "us-east-1"
-aws_profile = "sbxservice-poc"  # Set to your local AWS profile
+aws_region     = "us-east-1"
+aws_profile    = "sbxservice-poc"  # Set to your local AWS profile
+aws_account_id = "123456789012"    # Replace with your AWS account ID
 
 # Environment Settings
-environment = "dev"
+environment  = "dev"
 project_name = "sbxservice"
 
 # VPC Configuration
-vpc_cidr = "10.0.0.0/16"
-availability_zones = ["us-east-1a", "us-east-1b"] 
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
 
-# Certificate ARNs
+# Container Images
+container_image_hello = "123456789012.dkr.ecr.us-east-1.amazonaws.com/sbxservice-hello-service:latest"
+
+# Kong Gateway Configuration
+kong_enabled               = true
+kong_control_plane_enabled = true
+kong_db_enabled            = true
+
+# Kong Database Configuration
+kong_db_use_rds  = true  # Use RDS (recommended) or ECS container (false)
+kong_db_name     = "kong"
+kong_db_user     = "kong"
+# kong_db_password = "KongPassword123!"  # Default password, uncomment to override
+
+# RDS-specific configuration (only used if kong_db_use_rds = true)
+kong_db_instance_class      = "db.t3.micro"  # db.t3.small for production
+kong_db_allocated_storage   = 20             # GB
+kong_db_multi_az            = false          # Set to true for production HA
+kong_db_deletion_protection = false          # Set to true for production
+kong_db_skip_final_snapshot = true           # Set to false for production
+
+# Traffic Routing Configuration
+direct_routing_enabled = false  # Set to true to enable direct routing bypass
+kong_traffic_weight    = 100    # Percentage through Kong (0-100)
+direct_traffic_weight  = 0      # Percentage direct to service (0-100)
+
+# Certificate ARNs (optional)
 # acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/example-cert-id"  # For HTTPS on ALB
 # certificate_authority_arn = "arn:aws:acm:us-east-1:123456789012:certificate/example-ca-id"  # For TLS inspection 
